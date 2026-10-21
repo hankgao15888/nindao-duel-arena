@@ -1,0 +1,11 @@
+.is-xiayin .shenju-panel{border-color:#cfbe8b;background:linear-gradient(90deg,#263026df,#1d2823ce)}
+.is-xiayin .shenju-follow i{background:#ecdcad;box-shadow:0 0 7px #d8bc71}
+.is-xiayin .shenju-energy{background:#283127}
+.is-xiayin .shenju-energy i{background:linear-gradient(90deg,#727b53,#b6ba88,#e6d9a6);box-shadow:none}
+.is-xiayin .skill-one{background:radial-gradient(circle at 30% 25%,#d7c38c,#686647 60%,#26362b);border-color:#ead9ac}
+.is-xiayin .skill-two{background:radial-gradient(circle at 30% 25%,#aeb99a,#56694c 60%,#243b30);border-color:#d9d1a9}
+.is-xiayin .attack{background:radial-gradient(circle at 30% 25%,#a7ac83,#687650 58%,#233a2d)}
+.xiayin-scroll-control{display:inline-flex;align-items:center;gap:5px;font-size:9px;color:#e7ddba;background:#213024cc;padding:4px 6px;border:1px solid #a7a17c55;border-radius:3px;pointer-events:auto}
+.xiayin-scroll-control select{background:#26382d;border:1px solid #c7b78066;color:#eee3bf;padding:3px;font-size:9px;border-radius:2px}
+.hero-panel:has(img[src*="hashirama-xiayin"]) .hero-caption{padding-top:19%}.hero-panel:has(img[src*="hashirama-xiayin"]) .hero-skills{gap:5px}.hero-panel:has(img[src*="hashirama-xiayin"]) .hero-skill p{line-height:1.45}
+@media(max-width:760px){.xiayin-scroll-control{font-size:7px;padding:2px}.xiayin-scroll-control select{font-size:7px;padding:2px}}

@@ -1,0 +1,17 @@
+.shenju-energy{height:10px;position:relative;border:1px solid #8f6d4866;background:#211d1fe8;margin-top:5px;overflow:hidden;transform:skewX(-8deg)}
+.shenju-energy i{display:block;height:100%;background:linear-gradient(90deg,#b84c29,#efad40,#ffe0a1);box-shadow:0 0 10px #fc692c}
+.shenju-energy span{position:absolute;inset:0;font:700 8px/9px 'Microsoft YaHei',sans-serif;text-align:center;color:#fff2d2;text-shadow:0 1px 2px #000;transform:skewX(8deg)}
+.shenju-panel{position:absolute;left:28%;bottom:7%;width:19%;background:linear-gradient(90deg,#24191ddd,#181d22b8);border-left:2px solid #fa9d55;padding:8px 9px;color:#f9dfbb;pointer-events:none}
+.shenju-panel>b{font-size:10px;letter-spacing:.5px}.shenju-panel>span{display:block;font-size:8px;line-height:1.5;color:#cabaa5}
+.shenju-follow{height:3px;background:#1c161a;margin:6px 0}.shenju-follow i{display:block;height:100%;background:#ffd467;box-shadow:0 0 8px #f9aa31}
+.wushuang-track{height:17px;position:relative;background:#1c121b;border:1px solid #ffb86a88;margin-top:7px;transform:skewX(-8deg)}
+.wushuang-track>i{height:100%;display:block;background:linear-gradient(90deg,#702622,#e65223,#ffd477)}.wushuang-track>b{position:absolute;inset:0;font:700 9px/15px 'Microsoft YaHei';text-align:center;text-shadow:0 1px 2px #000}
+.training-supply{position:absolute;top:24%;left:3%;pointer-events:auto;border-color:#e0b97388;font-size:10px}
+.is-shenju .skill-one,.is-shenju .skill-two{background:radial-gradient(circle at 30% 25%,#b3714b,#503332 55%,#251c26);border-color:#efbb80}
+.is-shenju .attack{background:radial-gradient(circle at 34% 23%,#dd9b64,#985039 55%,#38212b)}
+.is-wushuang .skill-one{background:radial-gradient(circle at 30% 25%,#a8e7ff,#27699a 55%,#142d53);border-color:#a4edff;box-shadow:0 0 24px #36a6e999}
+.is-wushuang .attack{box-shadow:0 0 25px #ff612c99;border-color:#ffe0a0}
+.is-shenju .action-button b{max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hero-panel:has(img[src*="madara-shenju"]) .hero-caption{padding-top:20%}.hero-panel:has(img[src*="madara-shenju"]) .hero-skills{gap:5px}.hero-panel:has(img[src*="madara-shenju"]) .hero-skill p{line-height:1.45}
+@media(max-width:760px){.shenju-panel{left:28%;top:25%;bottom:auto;width:43%;padding:6px}.shenju-panel>b{font-size:10px}.shenju-panel>span{font-size:8px}.training-supply{top:25%;font-size:8px}.shenju-energy span{font-size:6px}.shenju-energy{height:8px}}
+[hidden]{display:none!important}
