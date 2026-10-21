@@ -229,6 +229,14 @@
     }
     _clearCombo() { this.state.combo = this.state.comboTime = 0; }
 
+    _resetCooldowns(f) {
+      for (const key of Object.keys(f.cooldowns)) f.cooldowns[key] = 0;
+    }
+
+    _resetRoundCooldowns() {
+      for (const side of ['player', 'enemy']) this._resetCooldowns(this.state[side]);
+    }
+
     _action(f, key) {
       const s = this.state, target = s[opposite(f.side)];
       if (f.dead) return false;
@@ -530,6 +538,7 @@
       if (f.dead) return;
       f.dead = true; f.hp = 0;
       this._resetReaction(f); this._clearCombo();
+      this._resetRoundCooldowns();
       this._effect('burst', f.x, f.y - 50, f.profile.color || '#ffc75f', .8, { radius: 130 });
       this._event('ko', { fighter: f, side: f.side, reason, training: this.mode === 'training' });
       if (this.mode === 'training' && f.side === 'enemy') {
@@ -550,6 +559,7 @@
         this._resetReaction(f, .8, 'spawn');
         f.x = 925; f.y = 505;
         s.entities = []; this._clearCombo();
+        this._resetRoundCooldowns();
         this._banner('练习继续', 1);
         return;
       }
@@ -572,6 +582,7 @@
       const other = s[opposite(side)];
       this._resetReaction(other, other.dead ? 0 : .8, other.dead ? '' : 'spawn');
       if (!other.dead) { other.x = side === 'player' ? 950 : 330; other.y = 505; }
+      this._resetRoundCooldowns();
       this._banner(`${s[side].profile.name || '忍者'} 登场`, 1.4);
       this._event('round', { round: s.round, side, player: s.player, enemy: s.enemy });
     }

@@ -77,7 +77,7 @@
     <p>神驹斑最多六格奥义点，U / I 使用能量条。O 消耗四格进入无双；J 九段连斩，U 蓝色键或 O 消耗剩余点数与能量发动须佐终结。无双期间仅命中回能，斩击时有霸体。练习模式可点“练习补给”体验完整招式。</p>
     <p><b>侠隐江湖专属：</b>U 金钟格挡，可长按；黄条内再次 U 落钟，成功格挡后落钟索敌。U 快接 J 为跳抓，I 快接 J 为乘龙俯冲，也可从技能按钮滑向普攻。4A 后上方向加 J 进入空中连击。钟禁锢敌人时，J 飞踢送钟，I 双龙盘钟，U 钟上感化（技能需冷却就绪）。左下角可选择明神门或树界降临。</p>
     <p><b>忍战带土专属：</b>U 扦插固定，再按 U 爆风乱舞，引燃木刺追加爆炸。I 神威可取消普攻或忍术，并解锁 Q 突进、E 坠落；短按攻击，长按只虚化移动。子技能命中后 J 吸入时空间，再按 J 提前扔出，或用 U 扔出接木遁。神威瞬间闪避攻击会触发紫光，紫光子技能命中后可接 U 空间火遁、O 魔像巨掌。普通 O 为十尾奥义。</p>
-    <p>三人依次出战，击倒对方全队获胜。练习模式的对手不主动攻击。当前为原版规则的参考实现，精确帧数和数值仍有简化。</p>`;
+    <p>三人依次出战，击倒对方全队获胜。每个小回合分出胜负后，双方技能冷却全部归零，下一位忍者登场时再次重置；练习目标击破、恢复时同样生效。生命值和奥义点沿用现有规则。练习模式的对手不主动攻击。当前为原版规则的参考实现，精确帧数和数值仍有简化。</p>`;
   $('help').onclick=()=>{pausedForModal=!!engine&&engine.state.status==='playing';if(pausedForModal)engine.pause(true);clearControls();modal('HOW TO PLAY','操作说明',keyHints(helpBody),[['知道了',()=>{if(pausedForModal)resume();else $('modal').hidden=true;},true]]);};
   $('reference').onclick=()=>{const n=byId(viewed);modal('CHARACTER REFERENCE',n.name,`<div class="reference-notes"><strong>${esc(fullName(n))}</strong><p>技能名称与主要表现参考用户提供的角色攻略。本作使用自行编写的动画与战斗逻辑。</p><p>冷却、伤害、移动距离和浮空数值为本地游戏调校，不能作为原版数据使用。</p>${n.notes?`<p>${esc(n.notes)}</p>`:''}<a href="${esc(n.source)}" target="_blank" rel="noopener">打开该角色的参考文章 ↗</a></div>`,[['返回选人',()=>$('modal').hidden=true,true]]);};
   $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'音效：开':'音效：关';if(sound)tone(660,.12);};

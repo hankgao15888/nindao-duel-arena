@@ -12,6 +12,7 @@
       const f=this.state.player;if(isXY(f)&&key==='j'&&!value&&f.attackIndex===2)f.xiayin.basicRelease=true;
     }
     setXiayinScroll(value){const f=this.state.player;if(isXY(f))f.xiayin.scroll=value==='forest'?'forest':'gate';}
+    _resetCooldowns(f){super._resetCooldowns(f);if(isXY(f))f.xiayin.bellCooldown=0;}
     action(key){if(isXY(this.state.player)){if(this.state.status!=='playing')return false;return this._action(this.state.player,key===' '?'space':String(key).toLowerCase());}return super.action(key);}
     _resetReaction(f,invuln=0,kind=''){
       if(f.captured)this._xyRelease(f);
