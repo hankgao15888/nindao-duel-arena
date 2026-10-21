@@ -4,19 +4,26 @@
   const $ = id => document.getElementById(id);
   const roster = window.NINJAS || [];
   const esc = v => String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  if (!roster.length || !window.ArenaEngine || !window.ArenaRenderer) { $('selection').innerHTML='<p style="padding:50px">游戏文件未完整加载。请保持整个“忍道决斗场”文件夹完整，然后双击桌面的“火影忍者决斗场.html”。</p>'; return; }
+  if (!roster.length || !window.ArenaEngine || !window.ArenaRenderer || !window.ArenaKeybindings) { $('selection').innerHTML='<p style="padding:50px">游戏文件未完整加载。请刷新页面；本地游玩时，请保留整个游戏文件夹，再打开 index.html。</p>'; return; }
   const renderer = new window.ArenaRenderer($('arena'));
   let team = roster.slice(0,3).map(n=>n.id), slot=0, viewed=team[0], rank='all', mode='duel', engine=null, pausedForModal=false;
   let last=performance.now(), drawTime=0, lastHUD=0, portraitIds='', toastTimer, audio=null, sound=false, won=false;
-  const held = new Set(), byId=id=>roster.find(n=>n.id===id)||roster[0];
+  const held = new Set(), pressedKeys = new Map(), pointerKeys = new Map(), byId=id=>roster.find(n=>n.id===id)||roster[0];
+  let keyStorage;try{keyStorage=window.localStorage;}catch{}
+  const keybindings = new window.ArenaKeybindings(keyStorage);
+  let listeningFor=null, settingsResume=false, settingsOpener=null;
+  const keyLabel = action => keybindings.label(action);
+  const movementLabel = () => ['w','a','s','d'].map(keyLabel).join(' / ');
+  const keyHints = text => String(text).replace(/\bWASD\b|\b[JUIOHLQE]\b|空格/g,
+    token => token==='WASD'?movementLabel():keyLabel(token==='空格'?'space':token.toLowerCase()));
   const joystick=$('joystick'),stick={x:0,y:0,pointerId:null};
   function movementInput(){
-    const keyboardX=(held.has('d')||held.has('arrowright')?1:0)-(held.has('a')||held.has('arrowleft')?1:0);
-    const keyboardY=(held.has('s')||held.has('arrowdown')?1:0)-(held.has('w')||held.has('arrowup')?1:0);
+    const keyboardX=(held.has('d')?1:0)-(held.has('a')?1:0);
+    const keyboardY=(held.has('s')?1:0)-(held.has('w')?1:0);
     return {x:Math.max(-1,Math.min(1,keyboardX+stick.x)),y:Math.max(-1,Math.min(1,keyboardY+stick.y))};
   }
   function clearControls(){
-    held.clear();stick.x=stick.y=0;
+    held.clear();pressedKeys.clear();pointerKeys.clear();stick.x=stick.y=0;
     const pointerId=stick.pointerId;stick.pointerId=null;
     if(pointerId!==null&&joystick.hasPointerCapture(pointerId))joystick.releasePointerCapture(pointerId);
     if(engine){engine.setInput({x:0,y:0});if(engine.setButtonHeld)for(const k of ['j','u','i','q','e'])engine.setButtonHeld(k,false);}
@@ -41,7 +48,7 @@
   }
   function drawDetail() {
     const n=byId(viewed);$('heroArt').innerHTML=portrait(n);bindFallbacks($('heroArt'));$('heroName').textContent=n.name;$('heroVariant').textContent=n.variant||'常规形态';$('heroRank').textContent=n.rank||'A';
-    $('heroSkills').innerHTML=[...n.skills.map((s,i)=>({...s,key:i?'I':'U'})),{...n.ultimate,key:'O'}].map(s=>`<div class="hero-skill"><span>${s.key}</span><div><b>${esc(s.name)}</b><p>${esc(s.description||'按对应按键施放忍术。')}</p></div></div>`).join('');
+    $('heroSkills').innerHTML=[...n.skills.map((s,i)=>({...s,key:i?'i':'u'})),{...n.ultimate,key:'o'}].map(s=>`<div class="hero-skill"><span>${esc(keyLabel(s.key))}</span><div><b>${esc(s.name)}</b><p>${esc(keyHints(s.description||'按对应按键施放忍术。'))}</p></div></div>`).join('');
   }
   function save(){try{localStorage.setItem('naruto-duel-team',JSON.stringify(team));}catch{}}
   function pick(id){const existing=team.indexOf(id);if(existing!==-1&&existing!==slot){[team[slot],team[existing]]=[team[existing],team[slot]];}else team[slot]=id;viewed=id;slot=(slot+1)%3;save();drawRoster();drawSquad();drawDetail();tone(350,.04);}
@@ -71,10 +78,49 @@
     <p><b>侠隐江湖专属：</b>U 金钟格挡，可长按；黄条内再次 U 落钟，成功格挡后落钟索敌。U 快接 J 为跳抓，I 快接 J 为乘龙俯冲，也可从技能按钮滑向普攻。4A 后上方向加 J 进入空中连击。钟禁锢敌人时，J 飞踢送钟，I 双龙盘钟，U 钟上感化（技能需冷却就绪）。左下角可选择明神门或树界降临。</p>
     <p><b>忍战带土专属：</b>U 扦插固定，再按 U 爆风乱舞，引燃木刺追加爆炸。I 神威可取消普攻或忍术，并解锁 Q 突进、E 坠落；短按攻击，长按只虚化移动。子技能命中后 J 吸入时空间，再按 J 提前扔出，或用 U 扔出接木遁。神威瞬间闪避攻击会触发紫光，紫光子技能命中后可接 U 空间火遁、O 魔像巨掌。普通 O 为十尾奥义。</p>
     <p>三人依次出战，击倒对方全队获胜。练习模式的对手不主动攻击。当前为原版规则的参考实现，精确帧数和数值仍有简化。</p>`;
-  $('help').onclick=()=>{pausedForModal=!!engine&&engine.state.status==='playing';if(pausedForModal)engine.pause(true);clearControls();modal('HOW TO PLAY','操作说明',helpBody,[['知道了',()=>{if(pausedForModal)resume();else $('modal').hidden=true;},true]]);};
+  $('help').onclick=()=>{pausedForModal=!!engine&&engine.state.status==='playing';if(pausedForModal)engine.pause(true);clearControls();modal('HOW TO PLAY','操作说明',keyHints(helpBody),[['知道了',()=>{if(pausedForModal)resume();else $('modal').hidden=true;},true]]);};
   $('reference').onclick=()=>{const n=byId(viewed);modal('CHARACTER REFERENCE',n.name,`<div class="reference-notes"><strong>${esc(fullName(n))}</strong><p>技能名称与主要表现参考用户提供的角色攻略。本作使用自行编写的动画与战斗逻辑。</p><p>冷却、伤害、移动距离和浮空数值为本地游戏调校，不能作为原版数据使用。</p>${n.notes?`<p>${esc(n.notes)}</p>`:''}<a href="${esc(n.source)}" target="_blank" rel="noopener">打开该角色的参考文章 ↗</a></div>`,[['返回选人',()=>$('modal').hidden=true,true]]);};
   $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'音效：开':'音效：关';if(sound)tone(660,.12);};
   $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('stage').requestFullscreen();}catch{toast('当前浏览器不支持全屏，可按 F11。');}};
+  function refreshKeyLabels(){
+    document.querySelectorAll('[data-action] kbd').forEach(kbd=>{kbd.textContent=keyLabel(kbd.parentElement.dataset.action);});
+    joystick.querySelector('span').textContent='拖动 / '+movementLabel();
+    $('arena').setAttribute('aria-label',`忍者决斗场，${movementLabel()}移动，${keyLabel('j')}普攻，${keyLabel('u')}和${keyLabel('i')}技能，${keyLabel('o')}奥义，${keyLabel('space')}替身`);
+    drawDetail();if(engine)syncHUD();
+  }
+  function drawKeySettings(){
+    $('keyGrid').innerHTML=window.ArenaKeybindings.actions.map(a=>`<button type="button" class="key-binding ${listeningFor===a.id?'listening':''}" data-bind="${a.id}" aria-label="修改${a.name}，当前${esc(keyLabel(a.id))}" aria-pressed="${listeningFor===a.id}"><span>${a.name}</span><kbd>${listeningFor===a.id?'请按键…':esc(keyLabel(a.id))}</kbd></button>`).join('');
+    $('keyGrid').querySelectorAll('[data-bind]').forEach(button=>button.onclick=()=>{
+      clearControls();listeningFor=button.dataset.bind;drawKeySettings();
+      $('keyStatus').textContent='请按下新的按键；Esc 取消这次录入。';
+      $('keyGrid').querySelector(`[data-bind="${listeningFor}"]`).focus();
+    });
+  }
+  function openKeySettings(event){
+    if(!$('keySettings').hidden)return;
+    settingsOpener=event?.currentTarget||document.activeElement;
+    settingsResume=!!engine&&engine.state.status==='playing';
+    if(settingsResume)engine.pause(true);
+    clearControls();listeningFor=null;drawKeySettings();
+    $('keyStatus').textContent='点击要修改的操作，再按下新按键。修改立即生效。';
+    $('keySettings').hidden=false;$('keyGrid').querySelector('button').focus();
+    for(const region of [document.querySelector('.topbar'),$('selection'),$('hud'),$('modal')])region.inert=true;
+  }
+  function closeKeySettings(){
+    listeningFor=null;clearControls();$('keySettings').hidden=true;
+    for(const region of [document.querySelector('.topbar'),$('selection'),$('hud'),$('modal')])region.inert=false;
+    if(settingsResume&&engine?.state.status==='paused')engine.pause(false);
+    settingsResume=false;
+    if(engine?.state.status==='playing')$('arena').focus();else settingsOpener?.focus();
+  }
+  document.querySelectorAll('[data-key-settings]').forEach(button=>button.onclick=openKeySettings);
+  $('closeKeySettings').onclick=closeKeySettings;
+  $('resetKeys').onclick=()=>{
+    listeningFor=null;clearControls();const saved=keybindings.reset();drawKeySettings();refreshKeyLabels();
+    $('keyStatus').textContent=saved?'已恢复默认按键，并保存到当前浏览器。':'已恢复默认按键；当前浏览器无法保存，关闭页面后会恢复默认。';
+    $('resetKeys').focus();
+  };
+  $('keySettings').addEventListener('click',event=>{if(event.target===$('keySettings'))closeKeySettings();});
   function controlLabel(fighter){
     if(fighter.dead)return '退场';
     if(fighter.inKamui)return '神威空间';
@@ -86,7 +132,7 @@
     return fighter.stun>0?'受击':'';
   }
   function act(key){
-    if(!engine||engine.state.status!=='playing'||!$('modal').hidden)return;
+    if(!engine||engine.state.status!=='playing'||!$('modal').hidden||!$('keySettings').hidden)return;
     const player=engine.state.player;if(!player||player.dead)return;
     const locked=controlLabel(player);
     if(locked&&key!=='space'){toast(`${locked}中，仅可使用替身`);return;}
@@ -95,20 +141,55 @@
     if(key==='space'&&player.cooldowns.space>0){toast('替身尚未冷却');return;}
     engine.setInput(movementInput());engine.action(key);syncHUD();
   }
-  function keyName(e){return e.code==='Space'?'space':e.key.toLowerCase();}
-  window.addEventListener('keydown',e=>{if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;const k=keyName(e);if(['space','arrowup','arrowdown','arrowleft','arrowright'].includes(k))e.preventDefault();if(k==='escape'){if(!$('modal').hidden){if(engine&&engine.state.status==='paused')resume();else $('modal').hidden=true;}else pauseGame();return;}held.add(k);if(engine?.setButtonHeld)engine.setButtonHeld(k,true);if(['j','u','i','o','space','l','h','q','e'].includes(k)&&(!e.repeat||k==='j'))act(k);});
-  window.addEventListener('keyup',e=>{const k=keyName(e);held.delete(k);if(engine?.setButtonHeld)engine.setButtonHeld(k,false);});
+  function updateButtonHeld(key){engine?.setButtonHeld?.(key,held.has(key)||[...pointerKeys.values()].includes(key));}
+  window.addEventListener('keydown',e=>{
+    if(!$('keySettings').hidden){
+      if(e.code==='Escape'){
+        e.preventDefault();if(e.repeat)return;
+        if(listeningFor){const action=listeningFor;listeningFor=null;drawKeySettings();$('keyStatus').textContent='已取消录入，按键未改变。';$('keyGrid').querySelector(`[data-bind="${action}"]`).focus();}
+        else closeKeySettings();return;
+      }
+      if(listeningFor){
+        e.preventDefault();if(e.repeat)return;
+        if(e.ctrlKey||e.altKey||e.metaKey||!window.ArenaKeybindings.allowed(e.code)){$('keyStatus').textContent='请使用字母、数字、方向键或常用单键；Esc 用于取消。';return;}
+        const action=listeningFor,result=keybindings.bind(action,e.code);
+        if(!result.ok)return;
+        clearControls();listeningFor=null;drawKeySettings();refreshKeyLabels();
+        $('keyStatus').textContent=(result.swapped?`已与“${result.swapped}”交换按键。`:'按键已修改。')+(result.saved?'已自动保存到当前浏览器。':'当前浏览器无法保存，此设置仅在本次打开有效。');
+        $('keyGrid').querySelector(`[data-bind="${action}"]`).focus();return;
+      }
+      if(e.code==='Tab'){
+        const buttons=[...$('keySettings').querySelectorAll('button')],first=buttons[0],last=buttons[buttons.length-1];
+        if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+        else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+      }
+      return;
+    }
+    if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)||e.target.isContentEditable||e.ctrlKey||e.altKey||e.metaKey)return;
+    if(e.code==='Escape'){
+      e.preventDefault();if(e.repeat)return;
+      if(!$('modal').hidden){if(engine&&engine.state.status==='paused')resume();else $('modal').hidden=true;}else pauseGame();return;
+    }
+    if(!engine||engine.state.status!=='playing'||!$('modal').hidden)return;
+    const k=keybindings.resolve(e.code);if(!k)return;
+    e.preventDefault();pressedKeys.set(e.code,k);held.add(k);updateButtonHeld(k);
+    if(['j','u','i','o','space','l','h','q','e'].includes(k)&&(!e.repeat||k==='j'))act(k);
+  });
+  window.addEventListener('keyup',e=>{
+    const k=pressedKeys.get(e.code);pressedKeys.delete(e.code);if(!k)return;
+    if(![...pressedKeys.values()].includes(k))held.delete(k);updateButtonHeld(k);
+  });
   window.addEventListener('blur',()=>{clearControls();if(engine&&engine.state.status==='playing')pauseGame();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden){clearControls();if(engine&&engine.state.status==='playing')pauseGame();}});
   document.querySelectorAll('[data-action]').forEach(button=>{
-    button.addEventListener('pointerdown',event=>{event.preventDefault();if(engine?.setButtonHeld)engine.setButtonHeld(button.dataset.action,true);act(button.dataset.action);});
+    button.addEventListener('pointerdown',event=>{event.preventDefault();if(!engine||engine.state.status!=='playing'||!$('modal').hidden||!$('keySettings').hidden)return;pointerKeys.set(event.pointerId,button.dataset.action);updateButtonHeld(button.dataset.action);act(button.dataset.action);});
     button.addEventListener('click',event=>{if(event.detail===0)act(button.dataset.action);});
   });
   for(const key of ['u','i']){const button=document.querySelector(`[data-action="${key}"]`);
     button.addEventListener('pointerdown',event=>{const p=engine?.state.player;if(p?.xiayin||key==='i'&&p?.shenju)button.setPointerCapture(event.pointerId);});
     button.addEventListener('pointerup',event=>{const p=engine?.state.player;if(!p?.xiayin&&!(key==='i'&&p?.shenju))return;const r=document.querySelector('[data-action="j"]').getBoundingClientRect();if(event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom)act(p.xiayin?key+'j':'j');});
   }
-  for(const event of ['pointerup','pointercancel'])window.addEventListener(event,()=>{if(engine?.setButtonHeld)for(const k of ['j','u','i','q','e'])engine.setButtonHeld(k,false);});
+  for(const event of ['pointerup','pointercancel'])window.addEventListener(event,e=>{const key=pointerKeys.get(e.pointerId);pointerKeys.delete(e.pointerId);if(key)updateButtonHeld(key);});
   for(const side of ['p','e']){const bar=document.createElement('div');bar.id=side+'Energy';bar.className='shenju-energy';bar.hidden=true;bar.innerHTML='<i></i><span></span>';$(side+'Chakra').after(bar);}
   const special=document.createElement('div');special.id='shenjuPanel';special.className='shenju-panel';special.hidden=true;
   special.innerHTML='<b id="shenjuMove"></b><div class="shenju-follow"><i id="shenjuFollow"></i></div><span id="shenjuHint"></span><div id="wushuangTrack" class="wushuang-track" hidden><i></i><b></b></div>';$('hud').append(special);
@@ -198,7 +279,7 @@
       $(side+'Portrait').classList.toggle('protection-yellow',level==='yellow');
       $(side+'Portrait').classList.toggle('protection-red',level==='red');
     });
-    syncShenju(p);syncXiayin(p);syncObito(p);if(!p.xiayin)document.querySelector('[data-action="l"] b').textContent='秘卷';
+    syncShenju(p);syncXiayin(p);syncObito(p);$('shenjuHint').textContent=keyHints($('shenjuHint').textContent);document.querySelector('.bottom-hint').textContent=keyHints(document.querySelector('.bottom-hint').textContent);if(!p.xiayin)document.querySelector('[data-action="l"] b').textContent='秘卷';
     const locked=controlLabel(p);$('hud').classList.toggle('control-locked',!!locked);$('airborneStatus').hidden=!locked;
     $('airborneStatus').textContent=p.dead?'忍者退场 · 下一位即将登场':`${locked}中 · 仅可使用替身`;
     document.querySelectorAll('[data-action]').forEach(button=>{
@@ -219,5 +300,5 @@
     if(s.status==='ended')showResult();
   }
   function tick(now){const dt=Math.min(.033,(now-last)/1000);last=now;drawTime+=dt;if(engine){const input=movementInput();engine.setInput(input);engine.update(dt);renderer.render(engine.state,dt);const center=joystick.querySelector('.stick-center');center.style.transform=`translate(${input.x*24}px,${input.y*24}px)`;if(now-lastHUD>70){syncHUD();lastHUD=now;}}else renderer.render({elapsed:drawTime,status:'idle',entities:[],effects:[],player:null,enemy:null},dt);requestAnimationFrame(tick);}
-  drawRoster();drawSquad();drawDetail();requestAnimationFrame(tick);
+  drawRoster();drawSquad();refreshKeyLabels();requestAnimationFrame(tick);
 })();
