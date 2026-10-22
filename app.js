@@ -1,4 +1,4 @@
-/* Offline UI and controls. No network requests are required to play. */
+/* Guest play remains local; account access unlocks restricted ninjas and chat. */
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
@@ -6,7 +6,9 @@
   const esc = v => String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   if (!roster.length || !window.ArenaEngine || !window.ArenaRenderer || !window.ArenaKeybindings) { $('selection').innerHTML='<p style="padding:50px">游戏文件未完整加载。请刷新页面；本地游玩时，请保留整个游戏文件夹，再打开 index.html。</p>'; return; }
   const renderer = new window.ArenaRenderer($('arena'));
-  let team = roster.slice(0,3).map(n=>n.id), slot=0, viewed=team[0], rank='all', mode='duel', engine=null, pausedForModal=false;
+  const locked=n=>window.ArenaAuth?.isLocked(n)??true;
+  const playable=()=>roster.filter(n=>!locked(n));
+  let team = playable().slice(0,3).map(n=>n.id), slot=0, viewed=team[0], rank='all', mode='duel', engine=null, pausedForModal=false,pendingPick=null;
   let last=performance.now(), drawTime=0, lastHUD=0, portraitIds='', toastTimer, audio=null, sound=false, won=false;
   const held = new Set(), pressedKeys = new Map(), pointerKeys = new Map(), byId=id=>roster.find(n=>n.id===id)||roster[0];
   let keyStorage;try{keyStorage=window.localStorage;}catch{}
@@ -14,6 +16,9 @@
   let chatPausedEngine=null;
   window.addEventListener('arena-chat-open',()=>{chatPausedEngine=engine?.state.status==='playing'?engine:null;if(chatPausedEngine)engine.pause(true);clearControls();});
   window.addEventListener('arena-chat-close',()=>{clearControls();if(engine===chatPausedEngine&&engine?.state.status==='paused'&&$('modal').hidden&&$('keySettings').hidden)engine.pause(false);chatPausedEngine=null;});
+  let authPausedEngine=null;
+  window.addEventListener('arena-auth-open',()=>{authPausedEngine=engine?.state.status==='playing'?engine:null;if(authPausedEngine)engine.pause(true);clearControls();});
+  window.addEventListener('arena-auth-close',event=>{clearControls();if(!event.detail?.authenticated)pendingPick=null;if(engine===authPausedEngine&&engine?.state.status==='paused'&&$('modal').hidden&&$('keySettings').hidden)engine.pause(false);authPausedEngine=null;});
   let listeningFor=null, settingsResume=false, settingsOpener=null;
   const keyLabel = action => keybindings.label(action);
   const movementLabel = () => ['w','a','s','d'].map(keyLabel).join(' / ');
@@ -33,14 +38,17 @@
     joystick.querySelector('.stick-center').style.transform='translate(0px,0px)';
   }
   try { const saved=JSON.parse(localStorage.getItem('naruto-duel-team')||'null'); if (Array.isArray(saved)&&saved.length===3&&saved.every(id=>roster.some(n=>n.id===id))&&new Set(saved).size===3) team=saved; viewed=team[0]; } catch {}
+  function sanitizeTeam(){const pool=playable().map(n=>n.id),next=[];for(const id of team)next.push(pool.includes(id)&&!next.includes(id)?id:pool.find(value=>!next.includes(value)));team=next;if(!roster.some(n=>n.id===viewed)||locked(viewed))viewed=team[0];}
+  sanitizeTeam();
   const portrait = (n,cls='') => n.portrait ? `<img class="${cls}" src="${esc(n.portrait)}" alt="${esc(n.name)}" ${n.portraitPosition?`style="object-position:${esc(n.portraitPosition)}"`:''} loading="eager">` : typeof renderer.portraitSVG==='function' ? renderer.portraitSVG(n) : `<span style="font-size:42px;color:${esc(n.color||'#f0bf70')}">${esc(n.name.slice(0,1))}</span>`;
   const fullName=n=>n.name+(n.variant?`「${n.variant}」`:'');
   function bindFallbacks(root) { root.querySelectorAll('img').forEach(img=>img.addEventListener('error',()=>{ const n=roster.find(n=>img.getAttribute('src')===n.portrait); if(n&&typeof renderer.portraitSVG==='function') img.outerHTML=renderer.portraitSVG(n); else img.style.opacity='.15'; },{once:true})); }
   function drawRoster() {
     const q=$('search').value.trim().toLowerCase();
     const list=roster.filter(n=>(rank==='all'||(rank==='B'?['B','C'].includes(n.rank):n.rank===rank))&&fullName(n).toLowerCase().includes(q));
-    $('roster').innerHTML=list.length?list.map(n=>`<button class="ninja-card ${team.includes(n.id)?'selected':''} ${viewed===n.id?'viewing':''}" data-id="${esc(n.id)}" aria-label="选择${esc(fullName(n))}"><div class="card-art">${portrait(n)}<span class="card-rank">${esc(n.rank||'A')}</span>${team.includes(n.id)?`<span class="squad-number">${team.indexOf(n.id)+1}</span>`:''}</div><div class="card-caption"><b>${esc(n.name)}</b><small>${esc(n.variant||'常规形态')}</small></div></button>`).join(''):'<div class="empty-roster">没有找到符合条件的忍者</div>';
+    $('roster').innerHTML=list.length?list.map(n=>`<button class="ninja-card ${locked(n)?'login-locked':''} ${team.includes(n.id)?'selected':''} ${viewed===n.id?'viewing':''}" data-id="${esc(n.id)}" aria-label="${locked(n)?'登录解锁':'选择'}${esc(fullName(n))}"><div class="card-art">${portrait(n)}<span class="card-rank">${esc(n.rank||'A')}</span>${team.includes(n.id)?`<span class="squad-number">${team.indexOf(n.id)+1}</span>`:''}${locked(n)?'<span class="ninja-lock">登录解锁</span>':''}</div><div class="card-caption"><b>${esc(n.name)}</b><small>${esc(n.variant||'常规形态')}</small></div></button>`).join(''):'<div class="empty-roster">没有找到符合条件的忍者</div>';
     $('rosterCount').textContent=`${list.length} / ${roster.length} 位忍者`;
+    document.querySelector('.roster-meta>span:last-child').textContent=window.ArenaAuth?.user?'已登录 · 全部忍者可用':`游客可用 ${playable().length} 位 · 登录解锁全部`;
     bindFallbacks($('roster'));
     $('roster').querySelectorAll('[data-id]').forEach(b=>b.addEventListener('click',()=>pick(b.dataset.id)));
   }
@@ -54,17 +62,18 @@
     $('heroSkills').innerHTML=[...n.skills.map((s,i)=>({...s,key:i?'i':'u'})),{...n.ultimate,key:'o'}].map(s=>`<div class="hero-skill"><span>${esc(keyLabel(s.key))}</span><div><b>${esc(s.name)}</b><p>${esc(keyHints(s.description||'按对应按键施放忍术。'))}</p></div></div>`).join('');
   }
   function save(){try{localStorage.setItem('naruto-duel-team',JSON.stringify(team));}catch{}}
-  function pick(id){const existing=team.indexOf(id);if(existing!==-1&&existing!==slot){[team[slot],team[existing]]=[team[existing],team[slot]];}else team[slot]=id;viewed=id;slot=(slot+1)%3;save();drawRoster();drawSquad();drawDetail();tone(350,.04);}
+  function pick(id){if(locked(id)){pendingPick={id,slot};viewed=id;drawDetail();drawRoster();window.ArenaAuth?.open('登录后即可使用'+fullName(byId(id))+'，同时解锁新忍者和聊天。');return;}const existing=team.indexOf(id);if(existing!==-1&&existing!==slot){[team[slot],team[existing]]=[team[existing],team[slot]];}else team[slot]=id;viewed=id;slot=(slot+1)%3;save();drawRoster();drawSquad();drawDetail();tone(350,.04);}
   $('search').addEventListener('input',drawRoster);
   document.querySelectorAll('[data-rank]').forEach(b=>b.addEventListener('click',()=>{rank=b.dataset.rank;document.querySelectorAll('[data-rank]').forEach(x=>x.classList.toggle('active',x===b));drawRoster();}));
   document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('active',x===b));$('start').innerHTML=mode==='training'?'进入练习 <span>▶</span>':'开始决斗 <span>▶</span>';}));
-  $('random').addEventListener('click',()=>{team=[...roster].sort(()=>Math.random()-.5).slice(0,3).map(n=>n.id);viewed=team[0];slot=0;save();drawRoster();drawSquad();drawDetail();});
+  $('random').addEventListener('click',()=>{team=playable().sort(()=>Math.random()-.5).slice(0,3).map(n=>n.id);viewed=team[0];slot=0;save();drawRoster();drawSquad();drawDetail();});
   function toast(text){$('toast').textContent=text;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,1800);}
   function tone(freq,duration=.06,type='sine',gain=.04){if(!sound)return;try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();audio.resume();const o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.setValueAtTime(freq,audio.currentTime);o.frequency.exponentialRampToValueAtTime(Math.max(40,freq*.45),audio.currentTime+duration);g.gain.setValueAtTime(gain,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+duration);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+duration);}catch{}}
   function onEvent(e){if(e.type==='hit')tone(130,.065,'triangle',.055);if(e.type==='cast')tone(500,.14,'sawtooth',.025);if(e.type==='ko')tone(90,.4,'triangle',.08);if(e.type==='end')setTimeout(showResult,400);}
-  function begin(){clearControls();won=false;const enemies=[...roster].sort(()=>Math.random()-.5).slice(0,3).map(n=>n.id);engine=new window.ArenaEngine({roster,team:[...team],enemy:enemies,difficulty:$('difficulty').value,mode,onEvent});engine.start();portraitIds='';$('selection').hidden=true;$('modal').hidden=true;$('hud').hidden=false;$('trainingTip').hidden=mode!=='training';$('arena').focus();syncHUD();tone(700,.22);}
+  function begin(){if(team.some(id=>locked(id))){sanitizeTeam();drawRoster();drawSquad();drawDetail();window.ArenaAuth?.open('此阵容含有需要登录的忍者，请先登录。');return;}clearControls();won=false;const enemies=playable().sort(()=>Math.random()-.5).slice(0,3).map(n=>n.id);engine=new window.ArenaEngine({roster,team:[...team],enemy:enemies,difficulty:$('difficulty').value,mode,onEvent});engine.start();portraitIds='';$('selection').hidden=true;$('modal').hidden=true;$('hud').hidden=false;$('trainingTip').hidden=mode!=='training';$('arena').focus();syncHUD();tone(700,.22);}
   $('start').addEventListener('click',begin);
   function showSelection(){clearControls();engine=null;$('hud').hidden=true;$('modal').hidden=true;$('selection').hidden=false;drawRoster();drawSquad();drawDetail();}
+  window.addEventListener('arena-auth-change',()=>{const restricted=team.some(id=>locked(id));if(restricted){sanitizeTeam();save();if(engine)showSelection();}if(window.ArenaAuth?.user&&pendingPick){const requested=pendingPick;pendingPick=null;slot=requested.slot;pick(requested.id);}drawRoster();drawSquad();drawDetail();});
   function modal(label,title,body,buttons){$('modalLabel').textContent=label;$('modalTitle').textContent=title;$('modalBody').innerHTML=body;$('modalActions').innerHTML='';buttons.forEach(([text,fn,primary])=>{const b=document.createElement('button');b.className=primary?'gold-button':'icon-button';b.textContent=text;b.onclick=fn;$('modalActions').append(b);});$('modal').hidden=false;}
   function resume(){if(engine&&engine.state.status==='paused')engine.pause(false);clearControls();$('modal').hidden=true;$('arena').focus();}
   function pauseGame(){if(!engine||engine.state.status==='ended')return;if(engine.state.status==='paused'){resume();return;}engine.pause(true);clearControls();modal('MATCH PAUSED','对战暂停','喘口气，下一次出手更加从容。',[['继续对战',resume,true],['重新选人',showSelection,false]]);}
