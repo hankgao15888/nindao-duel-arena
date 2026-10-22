@@ -1,0 +1,15 @@
+.site-presence{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;color:#9da99e;font-size:10px;letter-spacing:0;font-weight:400}
+.site-presence i{width:6px;height:6px;border-radius:50%;background:#788078;flex-shrink:0}
+.site-presence b{font-variant-numeric:tabular-nums;color:#c5cfc0;min-width:1ch}
+.site-presence.is-connected{color:#acc5a7}
+.site-presence.is-connected i{background:#a4df91;box-shadow:0 0 8px #9bff9266}
+.site-presence.is-connected b{color:#d5e8c7}
+.presence-stage{display:none;position:absolute;z-index:8;left:50%;top:7px;transform:translateX(-50%);padding:4px 9px;border:1px solid #9fbe8d38;border-radius:20px;background:#101a1de8;pointer-events:none}
+.stage:fullscreen .presence-stage{display:inline-flex}
+.stage:has(.hud:not([hidden]))>.presence-stage{display:none}
+.time-panel .presence-battle{display:none;font-size:9px;justify-content:center}
+.stage:fullscreen .time-panel .presence-battle{display:flex}
+.stage:fullscreen .time-panel .arena-label{display:none}
+@media(max-width:760px){.brand p{margin-top:3px}.brand .site-presence{font-size:9px;gap:4px}.brand .site-presence i{width:5px;height:5px}}
+@media(max-width:760px) and (orientation:landscape){.presence-stage{display:inline-flex;font-size:9px;top:4px;padding:3px 7px}}
+@media(max-width:760px) and (orientation:landscape){.time-panel .presence-battle{display:flex;font-size:8px}.time-panel .arena-label{display:none}}

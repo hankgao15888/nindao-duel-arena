@@ -1,10 +1,11 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>火影忍者 · 离线决斗场</title><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="shenju.css"><link rel="stylesheet" href="xiayin.css"><link rel="stylesheet" href="obito.css"><link rel="stylesheet" href="controls.css?v=20261022-keys1"><link rel="stylesheet" href="chat.css?v=20261022-chat1"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>火影忍者 · 离线决斗场</title><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="shenju.css"><link rel="stylesheet" href="xiayin.css"><link rel="stylesheet" href="obito.css"><link rel="stylesheet" href="controls.css?v=20261022-keys1"><link rel="stylesheet" href="chat.css?v=20261022-chat1"><link rel="stylesheet" href="presence.css?v=20261022-online1"></head>
 <body>
 <main class="game-shell">
-  <header class="topbar"><div class="brand"><span class="leaf">忍</span><div><h1>火影忍者 <em>决斗场</em></h1><p>离线同人演示 / DUEL ARENA</p></div></div><div class="top-actions"><span class="offline"><i></i>本地离线</span><button id="sound" class="icon-button">音效：关</button><button data-key-settings class="icon-button">按键设置</button><button id="help" class="icon-button">操作说明</button><button id="fullscreen" class="icon-button">全屏 ⛶</button></div></header>
+  <header class="topbar"><div class="brand"><span class="leaf">忍</span><div><h1>火影忍者 <em>决斗场</em></h1><p><span class="site-presence" data-online-count title="正在连接在线人数服务"><i aria-hidden="true"></i>在线人数：<b>—</b></span></p></div></div><div class="top-actions"><button id="sound" class="icon-button">音效：关</button><button data-key-settings class="icon-button">按键设置</button><button id="help" class="icon-button">操作说明</button><button id="fullscreen" class="icon-button">全屏 ⛶</button></div></header>
   <div id="stage" class="stage">
+    <span class="site-presence presence-stage" data-online-count title="正在连接在线人数服务"><i aria-hidden="true"></i>在线人数：<b>—</b></span>
     <canvas id="arena" width="1280" height="720" tabindex="0" aria-label="忍者决斗场，WASD移动，J普攻，U和I技能，O奥义，空格替身"></canvas>
     <section id="selection" class="selection" aria-label="决斗场选人">
       <div class="select-top"><div><span class="section-mark">決</span><h2>出战忍者 <small>选择三位忍者，按顺序出战</small></h2></div><div class="mode-switch"><button data-mode="duel" class="active">自由决斗 · 3V3</button><button data-mode="training">练习对战</button></div></div>
@@ -17,7 +18,7 @@
     </section>
     <section id="hud" class="hud" hidden aria-label="战斗状态">
       <div class="fighter-hud player-hud"><div id="pPortrait" class="hud-portrait"></div><div class="hud-info"><div class="hud-name"><b id="pName"></b><span id="pState">玩家</span></div><div class="hp-track"><div id="pHealth" class="hp-fill"></div><span id="pHPValue" class="hp-value">3000 / 3000</span></div><div id="pChakra" class="chakra-dots"></div><div id="pTeam" class="team-names"></div></div></div>
-      <div class="time-panel"><span>决斗场</span><strong id="timer">60</strong><small id="round">第一场</small></div>
+      <div class="time-panel"><span class="arena-label">决斗场</span><span class="site-presence presence-battle" data-online-count><i aria-hidden="true"></i>在线 <b>—</b> 人</span><strong id="timer">60</strong><small id="round">第一场</small></div>
       <div class="fighter-hud enemy-hud"><div id="ePortrait" class="hud-portrait"></div><div class="hud-info"><div class="hud-name"><b id="eName"></b><span id="eState">电脑</span></div><div class="hp-track"><div id="eHealth" class="hp-fill enemy-fill"></div><span id="eHPValue" class="hp-value">3000 / 3000</span></div><div id="eChakra" class="chakra-dots"></div><div id="eTeam" class="team-names"></div></div></div>
       <div class="arena-actions"><button id="pause" class="icon-button">暂停 Esc</button><button data-key-settings class="icon-button">按键设置</button><button id="reselect" class="icon-button">重新选人</button></div>
       <div id="combo" class="combo" hidden><strong></strong><span>连击</span></div>
@@ -46,4 +47,5 @@
 </main>
 <script src="roster.js"></script><script src="engine.js?v=20261022-round-cd1"></script><script src="renderer.js"></script><script src="shenju.js"></script><script src="shenju-renderer.js"></script><script src="xiayin.js?v=20261022-round-cd1"></script><script src="xiayin-renderer.js"></script><script src="obito.js?v=20261021-fx2"></script><script src="obito-renderer.js?v=20261021-fx2"></script><script src="controls.js?v=20261022-keys1"></script><script src="app.js?v=20261022-chat1"></script>
 <script src="chat.js?v=20261022-chat1"></script>
+<script src="presence.js?v=20261022-online1"></script>
 </body></html>
