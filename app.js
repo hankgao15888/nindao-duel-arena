@@ -11,6 +11,9 @@
   const held = new Set(), pressedKeys = new Map(), pointerKeys = new Map(), byId=id=>roster.find(n=>n.id===id)||roster[0];
   let keyStorage;try{keyStorage=window.localStorage;}catch{}
   const keybindings = new window.ArenaKeybindings(keyStorage);
+  let chatPausedEngine=null;
+  window.addEventListener('arena-chat-open',()=>{chatPausedEngine=engine?.state.status==='playing'?engine:null;if(chatPausedEngine)engine.pause(true);clearControls();});
+  window.addEventListener('arena-chat-close',()=>{clearControls();if(engine===chatPausedEngine&&engine?.state.status==='paused'&&$('modal').hidden&&$('keySettings').hidden)engine.pause(false);chatPausedEngine=null;});
   let listeningFor=null, settingsResume=false, settingsOpener=null;
   const keyLabel = action => keybindings.label(action);
   const movementLabel = () => ['w','a','s','d'].map(keyLabel).join(' / ');
