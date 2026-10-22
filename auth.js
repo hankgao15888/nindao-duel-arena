@@ -15,7 +15,7 @@
     <div class="account-mark" aria-hidden="true">忍</div><p class="account-eyebrow">DUEL ARENA · 忍者账号</p>
     <h2 id="accountTitle">登录决斗场</h2><p id="accountReason" class="account-reason">登录后解锁宇智波带土、新忍者和玩家聊天。</p>
     <div id="accountTabs" class="account-tabs" role="tablist" aria-label="账号操作"><button id="accountLoginTab" type="button" role="tab" aria-selected="true" aria-controls="accountForm">登录</button><button id="accountRegisterTab" type="button" role="tab" aria-selected="false" aria-controls="accountForm">注册账号</button></div>
-    <form id="accountForm" class="account-form" aria-label="账号登录">
+    <form id="accountForm" class="account-form" aria-label="账号登录" novalidate>
       <label for="accountUsername">用户名</label><input id="accountUsername" name="username" autocomplete="username" maxlength="20" required placeholder="输入你的用户名" aria-describedby="accountUsernameHint"><small id="accountUsernameHint">2—20 个字母、数字或下划线，支持中文</small>
       <label for="accountPassword">密码</label><div class="account-password"><input id="accountPassword" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required placeholder="输入密码（至少 12 个字符）" aria-describedby="accountPasswordHint"><button id="accountReveal" type="button" aria-pressed="false" aria-label="显示密码">显示</button></div><small id="accountPasswordHint">12—128 个字符；密码区分大小写</small>
       <div id="accountConfirmRow" class="account-confirm" hidden><label for="accountConfirm">确认密码</label><input id="accountConfirm" name="confirmPassword" type="password" autocomplete="new-password" maxlength="128" placeholder="再次输入密码"></div>
@@ -64,8 +64,26 @@
     finally{clearTimeout(timeout);options.signal?.removeEventListener('abort',cancel);}
   }
   async function json(path,options={},token){
-    const response=await raw(path,options,token),data=await response.json();
-    if(!response.ok){const error=Error(data.error||'账号服务暂时不可用。');error.status=response.status;throw error;}return data;
+    const response=await raw(path,options,token),type=response.headers.get('content-type')||'';
+    let data=null;
+    if(type.includes('application/json')){
+      try{data=await response.json();}catch{}
+    }else{
+      // Cloudflare and reverse proxies may return an HTML error page instead of JSON.
+      await response.text().catch(()=>'');
+    }
+    if(!response.ok){
+      let message=typeof data?.error==='string'?data.error:'';
+      if(!message){
+        if(response.status===403)message='账号服务拒绝了此次请求。请检查 VPN、代理或防火墙设置后重试。';
+        else if(response.status===429)message='提交次数过多，请稍等片刻再试。';
+        else if(response.status>=500)message='账号服务暂时繁忙，请稍后重试。';
+        else message='账号服务返回了异常状态（'+response.status+'），请稍后重试。';
+      }
+      const error=Error(message);error.status=response.status;error.code=data?.code||'';throw error;
+    }
+    if(!data){const error=Error('账号服务返回了无法识别的数据，请稍后重试。');error.status=502;throw error;}
+    return data;
   }
   async function authorized(path,options={}){
     const token=user&&session?.token;
@@ -107,14 +125,21 @@
   $('accountForm').onsubmit=async event=>{
     event.preventDefault();if(pending)return;
     const username=$('accountUsername').value.normalize('NFKC').trim(),password=$('accountPassword').value;
-    if(!/^[\p{L}\p{N}_]{2,20}$/u.test(username)){status('用户名需为 2—20 个字母、数字或下划线，支持中文。',true);return;}
-    if([...password].length<12||[...password].length>128){status('密码需为 12—128 个字符。',true);return;}
-    if(mode==='register'&&password!==$('accountConfirm').value){status('两次输入的密码不一致。',true);$('accountConfirm').focus();return;}
+    $('accountUsername').setAttribute('aria-invalid','false');$('accountPassword').setAttribute('aria-invalid','false');$('accountConfirm').setAttribute('aria-invalid','false');
+    if(!/^[\p{L}\p{N}_]{2,20}$/u.test(username)){$('accountUsername').setAttribute('aria-invalid','true');status('用户名需为 2—20 个字母、数字或下划线，支持中文。',true);$('accountUsername').focus();return;}
+    if([...password].length<12||[...password].length>128){$('accountPassword').setAttribute('aria-invalid','true');status('密码需为 12—128 个字符。',true);$('accountPassword').focus();return;}
+    if(mode==='register'&&password!==$('accountConfirm').value){$('accountConfirm').setAttribute('aria-invalid','true');status('两次输入的密码不一致。',true);$('accountConfirm').focus();return;}
     pending=true;status('正在'+(mode==='register'?'创建账号…':'登录…'));paint();
     try{
       const result=await json('/api/chat/auth/'+(mode==='register'?'register':'login'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
       session={...result,persistent:$('accountRemember').checked};user=result.user;mode='login';lastVerified=Date.now();saveSession();pending=false;paint();changed();close();
-    }catch(error){status(error.name==='AbortError'?'连接超时，请重试。':error.message,true);}
+    }catch(error){
+      let message=error?.message||'账号服务暂时不可用。';
+      if(error?.name==='AbortError')message='连接超时。请检查网络后重试。';
+      else if(error instanceof TypeError)message='无法连接账号服务。请检查网络、VPN 或防火墙后重试。';
+      else if(mode==='register'&&error?.status===409)message='此用户名已经注册。请点上方“登录”尝试原密码；如果你还没有账号，请换一个用户名注册。';
+      status(message,true);
+    }
     finally{pending=false;paint();}
   };
   $('accountLogout').onclick=async()=>{
