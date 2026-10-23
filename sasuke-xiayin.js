@@ -21,17 +21,17 @@
     _resetReaction(f,invuln=0,kind=''){if(f.sxGrab)this._sxRelease(f);if(isSX(f)){this._sxCancel(f);f.sasukeXiayin=fresh();}f.sxBurn=null;super._resetReaction(f,invuln,kind);}
     _substitute(f,t){const ok=super._substitute(f,t);if(ok){this._sxRelease(f);f.sxBurn=null;if(isSX(f))this._sxCancel(f);}return ok;}
     _sxStart(f,name,fx,duration,armor='skill'){
-      const previous=f.sasukeXiayin.skillCast;this._sxCancel(f);const s=f.sasukeXiayin;s.move={id:++serial,name,fx,duration,elapsed:0};f.action=fx.startsWith('ult')?'ultimate':fx==='basic'?'attack':'skill';f.actionTime=duration;f.armorKind=armor;f.armorTime=armor?duration:0;f.castName=name;f.castType='lightning';
+      const previous=f.sasukeXiayin.skillCast,height=f.sasukeXiayin.height;this._sxCancel(f);const s=f.sasukeXiayin;if(!fx.startsWith('ult'))s.height=height;s.move={id:++serial,name,fx,duration,elapsed:0};f.action=fx.startsWith('ult')?'ultimate':fx==='basic'?'attack':'skill';f.actionTime=duration;f.armorKind=armor;f.armorTime=armor?duration:0;f.castName=name;f.castType='lightning';
       if(fx!=='basic'){this._event('cast',{fighter:f,name,type:fx.includes('Fire')?'fire':'lightning',ultimate:fx.startsWith('ult')});this._effect('text',f.x,f.y-170,'#e6dcff',.65,{text:name});}
       const cast=previous&&['fireChase','thunderChase','guardChain','senbon'].includes(fx)?previous:{ownerUid:f.uid,awardChakra:!['basic','pulse','empower'].includes(fx)&&!fx.startsWith('ult'),pointAwarded:false};s.skillCast=cast;return cast;
     }
     _sxLater(f,time,fn){f.sasukeXiayin.events.push({time,fn});}
     _sxVisual(f,fx,x,y,life,props={}){return this._entity(f,{kind:'area',type:'lightning',sxFX:fx,x,y,life,radius:120,visualOnly:true,damage:0,...props});}
     _sxHit(f,fx,cast,props={}){return this._entity(f,{kind:'strike',type:fx.includes('Fire')?'fire':'lightning',sxFX:fx,sxAttached:true,x:f.x+f.facing*95,y:f.y,width:260,height:115,radius:130,life:.18,damage:70,lift:270,knockback:40,stun:.4,airReach:300,color:'#c5d5ff',follow:true,offsetX:95,cast,...props});}
-    _sxFace(f){const a=this._sxAim(f),t=this.state[opp(f.side)];f.facing=Math.abs(a.x)>.2?Math.sign(a.x):t.x>=f.x?1:-1;return a;}
+    _sxFace(f){const a=this._sxAim(f);this._face(f);return a;}
     _action(f,key){
       if(f.sxGrab&&key!=='space')return false;
-      if(!isSX(f))return super._action(f,key);
+      if(!isSX(f)){if(Math.abs(this._direction(f).x)>.15&&!f.dead&&!f.stun&&f.air<=0&&!f.knockdown&&!f.recovery&&!f.captured&&!f.inKamui&&!f.obRoot)this._face(f);const result=super._action(f,key);return result||key==='j'&&this._queueBasic(f);}
       const s=f.sasukeXiayin,t=this.state[opp(f.side)];if(f.dead||t.dead)return false;
       if(key==='space')return this._substitute(f,t);
       if(f.inKamui||f.captured||f.obRoot||f.stun>0||f.air>0||f._airV>0||f.knockdown>0||f.recovery>0)return false;
@@ -51,7 +51,7 @@
         if(s.follow==='thunderSword')return this._sxThunderChase(f);
         if(s.follow==='rise')return this._sxSenbon(f);
       }
-      if(f.actionTime>.02){if(key==='j'&&s.move?.fx==='basic'){s.queued=true;return true;}return false;}
+      if(f.actionTime>.02){if(key==='j'&&s.move?.fx==='basic'){s.queued=true;return true;}return key==='j'&&this._queueBasic(f);}
       if(key==='j')return this._sxBasic(f);
       if(key==='u'||key==='i'){
         if(s.energy<1)return false;s.energy-=1;this._sxFace(f);this._sxStart(f,key==='u'?'炎剑 · 起势':'雷剑 · 起势',key==='u'?'readyFire':'readyThunder',.24);s.pending={key,time:.22};return true;
@@ -74,6 +74,7 @@
       if(first==='u'){
         const cast=this._sxStart(f,'燎原十八拍 · 架势','fireGuard',1.15,'');s.guard=.85;s.guardSuccess=false;s.guardAward=false;s.guardStep=0;s.follow='fireGuard';s.followTime=1.2;s.holdTime=0;s.holdConsumed=false;
         this._sxVisual(f,'susanoArm',f.x+f.facing*90,f.y,1.15,{follow:true,offsetX:90,sxAttached:true});
+        this._sxVisual(f,'guardMantle',f.x,f.y,1.15,{follow:true,sxAttached:true,radius:160});
         this._sxLater(f,.08,()=>this._sxHit(f,'susanoArm',cast,{damage:48,lift:230,width:190}));return true;
       }
       if(last==='j'){
@@ -95,9 +96,10 @@
     _sxThunderChase(f){const cast=this._sxStart(f,'疾电穿云刺 · 雷影连斩','thunderChase',.83);for(let i=0;i<3;i++)this._sxLater(f,.06+i*.18,()=>this._sxHit(f,'slashThunder',cast,{damage:39,lift:260,width:300}));this._sxLater(f,.63,()=>{f.x=clamp(f.x+f.facing*110,100,1180);this._sxHit(f,'spear',cast,{damage:94,lift:340,width:360});});return true;}
     _sxGuardChain(f){
       const s=f.sasukeXiayin,success=s.guardSuccess,n=s.guardStep+1;
-      if(s.move?.fx==='guardChain'&&s.move.elapsed<s.move.duration*.7)return false;
+      if(s.move?.fx==='guardChain'&&s.move.elapsed<s.move.duration*.7){s.queued=true;return true;}
       if(!success&&n>1)return false;
       const duration=n===4?1:.55,cast=this._sxStart(f,n===4?'燎原十八拍 · 千鸟擒投':`燎原十八拍 · ${n}式`,'guardChain',duration,success?'adamant':'skill');s.guardSuccess=success;s.guardStep=n;
+      this._sxVisual(f,'eighteenBeat',f.x+f.facing*110,f.y,duration,{sxStage:n,follow:true,offsetX:110,sxAttached:true,radius:n>2?240:150});
       if(success&&n<4){s.follow='fireGuard';s.followTime=1.3;}
       const count=n===2?3:1;for(let i=0;i<count;i++)this._sxLater(f,.09+i*.15,()=>this._sxHit(f,n===3?'susanoSlash':n===4?'spearGrab':'swordWave',cast,{kind:n<3?'projectile':'strike',follow:n>=3,sxAttached:n>=3,vx:n<3?f.facing*640:0,width:n===3?430:280,radius:95,life:n<3?.75:.22,damage:n===4?170:n===3?125:40,lift:n===4?380:260,grab:n===4,sxCapture:n===4?.5:0}));return true;
     }
@@ -105,11 +107,13 @@
     _sxEmpower(f){const s=f.sasukeXiayin;if(s.enhanced>0&&f.chakra>=4)return this._sxUltimate(f,'Mountain');if(f.chakra<1)return false;f.chakra-=1;this._sxStart(f,'双剑齐鸣','empower',.5,'adamant');s.enhanced=14;f.attackIndex=0;f._lastBasic=10;this._sxVisual(f,'empower',f.x,f.y,.65,{follow:true,sxAttached:true});return true;}
     _sxBasic(f){
       const s=f.sasukeXiayin,enhanced=s.enhanced>0,max=enhanced?7:5;this._sxFace(f);let n=f._lastBasic<1.35?f.attackIndex%max+1:1;if(enhanced&&n>5&&!s.basicGrab)n=1;
-      f.attackIndex=n;f._lastBasic=0;const cast=this._sxStart(f,`${enhanced?'双剑强化 · ':''}${n}A`,'basic',[0,.32,.4,.5,.68,.7,.68,.75][n],'');s.basicStage=n;s.basicEnhanced=enhanced;
+      f.attackIndex=n;f._lastBasic=0;const cast=this._sxStart(f,`${enhanced?'双剑强化 · ':''}${n}A`,'basic',[0,.32,.4,.5,.68,.7,.68,.75][n],'');s.basicStage=n;s.basicEnhanced=enhanced;s.basicTravel=(enhanced?[0,42,56,64,260,48,76,165]:[0,30,44,58,0,62])[n];
       if(n===1)s.basicGrab=false;
       if(!enhanced&&n===4){s.phase=.2;this._sxVisual(f,'blink',f.x,f.y,.45);this._sxLater(f,.16,()=>{f.x=clamp(f.x+f.facing*120,100,1180);});}
       if(enhanced&&n===4)s.drift={x:f.facing,y:0};
-      if(!enhanced&&n===5)s.height=45;
+      if(!enhanced&&n===3)s.height=Math.max(s.height,28);
+      if(!enhanced&&n===5||enhanced&&n===6)s.height=Math.max(s.height,55);
+      this._sxVisual(f,'swordTrail',f.x,f.y,s.move.duration,{follow:true,sxAttached:true,sxStage:n,enhanced,radius:enhanced?130:90});
       this._sxLater(f,n===4?.22:.08,()=>this._sxHit(f,enhanced?'twinSlash':n===2||n===4?'slashFire':'slashThunder',cast,{damage:enhanced?48:30+n*3,isBasic:true,width:enhanced?310:240,lift:n>=3?310:0,sxBurn:n===2||n===4?2:0,grab:enhanced&&n===5,sxBasicGrab:enhanced&&n===5,sxCapture:enhanced&&n===5?.55:0}));
       if(n===3||n===5||enhanced&&n===7)this._sxLater(f,.36,()=>this._sxHit(f,n===5&&!enhanced?'spear':enhanced?'susanoSlash':'slashThunder',cast,{damage:enhanced?64:46,isBasic:true,width:n===5?500:340,offsetX:n===5?200:110,lift:350}));return true;
     }
@@ -137,7 +141,11 @@
       if(f.sxGrab)return;if(!isSX(f))return super._move(f,x,y,dt);const s=f.sasukeXiayin;s.aim={x,y};if(f.dead||f.stun>0||f.air>0||f.captured||f.inKamui||f.obRoot||f.knockdown>0||f.recovery>0)return;
       const fx=s.move?.fx;if(fx==='rise'&&s.move.elapsed<.27){const a=this._sxAim(f),d=s.drift||{};f.x=clamp(f.x+(Math.abs(a.x)+Math.abs(a.y)>.1?a.x:d.x||0)*680*dt,100,1180);f.y=clamp(f.y+(Math.abs(a.x)+Math.abs(a.y)>.1?a.y:d.y||0)*430*dt,400,590);return;}
       if(fx==='spear'&&s.move.elapsed<.4){f.x=clamp(f.x+f.facing*250*dt,100,1180);f.y=clamp(f.y+y*200*dt,400,590);return;}
-      if(fx==='basic'&&s.basicEnhanced&&s.basicStage===4){f.x=clamp(f.x+(Math.abs(x)+Math.abs(y)>.1?x:f.facing)*380*dt,100,1180);f.y=clamp(f.y+y*220*dt,400,590);return;}
+      if(fx==='basic'){
+        const m=s.move,rate=(s.basicTravel||0)/m.duration*Math.sin(Math.PI*clamp(m.elapsed/m.duration,0,1))*Math.PI/2;
+        const moving=Math.hypot(x,y)>.15,dx=s.basicEnhanced&&moving?x:f.facing,dy=s.basicEnhanced&&moving?y:0,len=Math.max(1,Math.hypot(dx,dy));
+        f.x=clamp(f.x+dx/len*rate*dt,100,1180);f.y=clamp(f.y+dy/len*rate*.85*dt,400,590);return;
+      }
       return super._move(f,x,y,dt);
     }
     _collides(e,t){if(e.visualOnly||isSX(t)&&t.sasukeXiayin.height>(e.airReach||130))return false;return super._collides(e,t);}
@@ -145,7 +153,7 @@
       if(isSX(t)&&t.sasukeXiayin.phase>0)return false;
       if(t.sxGrab&&t.sxGrab.ownerUid!==a.uid)return false;
       if(isSX(t)&&t.sasukeXiayin.guard>0&&!e.isUltimate&&!e.grab&&!e.sxDot&&t.invuln<=0){const s=t.sasukeXiayin,front=(a.x-t.x)*t.facing>=-30;if(s.move?.fx==='pulse'||front){s.guardSuccess=true;if(!s.guardAward){s.guardAward=true;s.energy=clamp(s.energy+.5,0,2);this._effect('text',t.x,t.y-170,'#ddc6ff',.65,{text:'格挡成功 · 能量 +½'});}if(s.move?.fx==='fireGuard'){s.guard=Math.max(s.guard,.8);s.followTime=Math.max(s.followTime,1.4);s.move.duration=Math.max(s.move.duration,s.move.elapsed+.8);t.actionTime=.8;}this._sxVisual(t,'guardFlash',t.x+t.facing*45,t.y,.3);return true;}}
-      if(e.sxDot){if(t.dead||t.invuln>0||t.inKamui||t.obito?.phase>0)return false;const scale=a.side==='enemy'?(this.difficulty==='easy'?.42:this.difficulty==='hard'?1.13:.64):1;t.hp=Math.max(0,t.hp-Math.round(e.damage*scale));this._effect('spark',t.x,t.y-55-t.air,'#ff9b40',.2,{radius:18});if(t.hp<=0)this._defeat(t,'ko');return true;}
+      if(e.sxDot){if(t.dead||t.invuln>0||t.inKamui||t.obito?.phase>0)return false;const scale=a.side==='enemy'?(this.difficulty==='easy'?.42:this.difficulty==='hard'?1.13:.64):1;t.hp=Math.max(0,t.hp-Math.round(e.damage*scale));this._effect('spark',t.x,t.y-55-t.air,'#b574ff',.2,{radius:18});if(t.hp<=0)this._defeat(t,'ko');return true;}
       const before=t.hp,hit=super._hit(a,t,e);if(!hit)return false;if(t.hp>=before)return hit;
       if(isSX(a)&&e.sxFX){a.sasukeXiayin.energy=clamp(a.sasukeXiayin.energy+.075,0,2);this._sxVisual(a,'impact',t.x,t.y-t.air,.3,{radius:e.isUltimate?160:65,fire:!!e.sxBurn});}
       if(e.sxBurn&&!t.dead)t.sxBurn={owner:a.side,uid:a.uid,time:e.sxBurn,tick:.5};

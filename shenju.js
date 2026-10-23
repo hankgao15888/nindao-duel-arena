@@ -63,7 +63,7 @@
       return super._action(f,key);
     }
     _sjBasic(f){
-      const s=f.shenju;f.facing=this.state[other(f.side)].x>=f.x?1:-1;
+      const s=f.shenju;this._face(f);
       f.attackIndex=f._lastBasic<1.15?f.attackIndex%4+1:1;f._lastBasic=0;
       const n=f.attackIndex,dur=[0,.34,.53,.42,.65][n],cast=this._sjStart(f,`${n}A`,'basic',dur,'');cast.awardChakra=false;
       s.branch=n;s.branchTime=2.1;f.x=clamp(f.x+f.facing*16,100,1180);

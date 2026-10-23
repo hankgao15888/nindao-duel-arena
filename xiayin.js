@@ -65,7 +65,7 @@
         if(s.guard>0||s.slide==='u'&&s.slideTime>0)return this._xyGrab(f,s.height>0);
         if(s.slide==='i'&&s.slideTime>0)return this._xyDive(f,true);
         if(bell&&f.actionTime<.05)return this._xyKick(f,bell);
-        const input=f.side==='player'?this.input:s.aim;
+        const input=this._direction(f);
         if(s.move?.fx==='basic'&&f.attackIndex===2&&s.basicRelease&&s.move.elapsed>.12&&s.move.elapsed<.33){s.height=80;s.vy=70;s.airCombo=0;f.actionTime=0;return this._xyAirBasic(f);}
         if(f.actionTime>.035){if(['basic','airBasic'].includes(s.move?.fx)){s.queued=true;return true;}return false;}
         if(s.height>0)return this._xyAirBasic(f);
@@ -104,7 +104,7 @@
       return super._action(f,key);
     }
     _xyBasic(f){
-      const s=f.xiayin,target=this.state[other(f.side)];f.facing=target.x>=f.x?1:-1;f.attackIndex=f._lastBasic<1.15?f.attackIndex%4+1:1;f._lastBasic=0;
+      const s=f.xiayin,target=this.state[other(f.side)];this._face(f,target);f.attackIndex=f._lastBasic<1.15?f.attackIndex%4+1:1;f._lastBasic=0;
       const n=f.attackIndex,cast=this._xyStart(f,`${n}A`,'basic',[0,.32,.48,.5,.66][n],'');cast.awardChakra=false;s.basicRelease=false;
       if(n===4){this._xyBreakBell(f);s.airReady=1.8;this._xyLater(f,.28,()=>this._xyBell(f,f.x+f.facing*145,f.y,s.bellCooldown<=0,cast));}
       else if(n===3){s.move.blinked=false;s.move.originalFacing=f.facing;this._xyLater(f,.2,()=>this._xyBlink(f,false));this._xyLater(f,.28,()=>this._xyHit(f,'branches',cast,{width:300,offsetX:125,damage:42,isBasic:true,lift:395}));}
@@ -113,11 +113,12 @@
     }
     _xyBlink(f,forceMax){
       const s=f.xiayin,m=s.move;if(m?.fx!=='basic'||f.attackIndex!==3||m.blinked)return;m.blinked=true;
-      const aim=f.side==='player'?this.input:s.aim,dir=m.originalFacing||f.facing,relative=aim.x*dir;
+      const aim=this._direction(f),dir=m.originalFacing||f.facing,relative=aim.x*dir;
       const held=s.inputHold>.18&&!forceMax,backward=relative<-.3,forward=relative>.3;
       const travel=held?105:245;this._effect('smoke',f.x,f.y-60,'#c3c9bc',.3,{radius:45});
       f.x=clamp(f.x+(backward?-dir:dir)*travel,105,1175);
       f.facing=backward?(held?-dir:dir):forward?(held?dir:-dir):this.state[other(f.side)].x>=f.x?1:-1;
+      if(f.side==='player'||this._onlineInputs)this._face(f);
       f.invuln=Math.max(f.invuln,.12);f.invulnKind='blink';
     }
     _xyAirBasic(f){
@@ -138,7 +139,7 @@
       const cast=this._xyStart(f,'慈悲 · 跃空擒拿','grab',1.05,'');f.invuln=Math.max(f.invuln,.32);f.invulnKind='blink';s.height=145;s.vy=0;
       this._xyLater(f,.16,()=>{f.x=x;});
       this._xyLater(f,.34,()=>{s.height=45;this._xyHit(f,'mercy',cast,{kind:'area',x:f.x,y:f.y,follow:false,radius:105,height:110,damage:150,lift:0,stun:.9,grab:true,execute:.1,knockback:0,groundSweep:true,life:.32});});
-      this._xyLater(f,.76,()=>{const aim=f.side==='player'?this.input:s.aim;this._effect('smoke',f.x,f.y-45,'#e3dac4',.3,{radius:55});f.x=clamp(f.x+(Math.abs(aim.x)>.3?Math.sign(aim.x):-dir)*205,105,1175);s.height=s.vy=0;});return true;
+      this._xyLater(f,.76,()=>{const aim=this._direction(f);this._effect('smoke',f.x,f.y-45,'#e3dac4',.3,{radius:55});f.x=clamp(f.x+(Math.abs(aim.x)>.3?Math.sign(aim.x):-dir)*205,105,1175);s.height=s.vy=0;});return true;
     }
     _xyDive(f,reuse){
       const s=f.xiayin;if(!reuse&&f.cooldowns.i>0)return false;if(s.move?.fx==='dive'||s.move?.fx==='ultimate')return false;
@@ -164,14 +165,14 @@
       if(f.captured&&!f.dead){const o=this.state.teams[f.captured.owner].find(a=>a.uid===f.captured.ownerUid),b=o?.xiayin?.bell;if(!b||b.time<=0||b.id!==f.captured.bellId)this._xyRelease(f);else{f.x=b.x;f.y=b.y;f.air=f._airV=f._vx=f._vy=f.knockdown=f.recovery=0;f.action='captured';f.stun=.2;f.actionTime=.2;}}
       if(!isXY(f)||f.dead)return;const s=f.xiayin;
       s.recast=Math.max(0,s.recast-dt);s.slideTime=Math.max(0,s.slideTime-dt);if(!s.slideTime)s.slide='';s.airReady=Math.max(0,s.airReady-dt);s.bellCooldown=Math.max(0,s.bellCooldown-dt);s.blocked=Math.max(0,s.blocked-dt);
-      const aim=f.side==='player'?this.input:s.aim;if(Math.abs(aim.x)>.3){const sign=Math.sign(aim.x);s.inputHold=s.inputSign===sign?s.inputHold+dt:0;s.inputSign=sign;}else{s.inputHold=0;s.inputSign=0;}
+      const aim=this._direction(f);if(Math.abs(aim.x)>.3){const sign=Math.sign(aim.x);s.inputHold=s.inputSign===sign?s.inputHold+dt:0;s.inputSign=sign;}else{s.inputHold=0;s.inputSign=0;}
       if(s.bell){const b=s.bell;b.time-=dt;b.x=clamp(b.x+b.vx*dt,110,1170);if(b.visual){b.visual.x=b.x;b.visual.y=b.y;b.visual.life=Math.max(.01,b.time);}
         if(s.move?.fx==='chant'){f.x=b.x;f.y=b.y;}
         if(b.vx&&(b.x===110||b.x===1170)){b.vx=0;this._xyVisual(f,'splinters',b.x,b.y,.5);const t=this.state[other(f.side)];if(t.captured?.bellId===b.id)this._xyHit(f,'bellShock',{ownerUid:f.uid,awardChakra:false},{kind:'area',x:b.x,y:b.y,follow:false,radius:100,height:140,damage:70,lift:0,knockback:0,life:.15});}
         if(b.time<=0)this._xyBreakBell(f);}
       if(f.captured||f.stun>0||f.air>0||f.knockdown>0||f.recovery>0){this._xyCancel(f);s.height=s.vy=0;return;}
       if(s.height>0&&!['grab','dive','chant','ultimate'].includes(s.move?.fx)){s.height=Math.max(0,s.height+s.vy*dt);s.vy-=380*dt;if(s.height>160){s.height=160;s.vy=Math.min(0,s.vy);}if(!s.height){s.vy=0;s.airCombo=0;}}
-      if(s.guard>0){s.guard=Math.max(0,s.guard-dt);const held=f.side==='enemy'?s.move?.elapsed<.7:this._xyButtons?.u;if(!s.guard||!held&&s.move?.elapsed>.2){s.guard=0;s.move=null;s.events=[];f.actionTime=0;this._clearArmor(f);}}
+      if(s.guard>0){s.guard=Math.max(0,s.guard-dt);const held=this._onlineButtons?!!this._onlineButtons[f.side]?.u:(f.side==='enemy'?s.move?.elapsed<.7:this._xyButtons?.u);if(!s.guard||!held&&s.move?.elapsed>.2){s.guard=0;s.move=null;s.events=[];f.actionTime=0;this._clearArmor(f);}}
       if(s.move){const move=s.move;move.elapsed+=dt;for(const event of [...s.events]){event.time-=dt;if(event.time<=0){s.events.splice(s.events.indexOf(event),1);event.fn();}}
         if(s.move===move&&move.elapsed>=move.duration){s.move=null;s.events=[];f.actionTime=0;this._clearArmor(f);if(s.queued){s.queued=false;this._action(f,'j');}}}
     }

@@ -37,7 +37,7 @@
       width:235,height:105,radius:110,life:.25,damage:65,knockback:65,lift:230,stun:.45,
       color:'#b1a0d5',follow:true,offsetX:85,cast,airReach:230,...props});}
     _obVisual(f,fx,x,y,life,props={}){return this._entity(f,{kind:'area',type:'genjutsu',obFX:fx,x,y,life,radius:120,visualOnly:true,damage:0,...props});}
-    _obAim(f){const aim=f.side==='player'?this.input:f.obito.aim;if(Math.abs(aim.x)>.3)f.facing=Math.sign(aim.x);return aim;}
+    _obAim(f){const aim=this._direction(f);this._face(f);return aim;}
     _action(f,key){
       if(!isOB(f)){if(f.inKamui&&key!=='space')return false;return super._action(f,key);}
       const s=f.obito,target=this.state[other(f.side)];if(f.dead||target.dead)return false;
@@ -52,7 +52,7 @@
       if(key==='q'||key==='e'){
         if(s.unlock<=0||s[key+'Used']||f.actionTime>.035&&s.move?.fx!=='phase')return false;
         s[key+'Used']=true;this._obStart(f,key==='q'?'神威 · 突进':'神威 · 坠落','subPrepare',.2,'');s.phase=Math.max(s.phase,.22);
-        this._obLater(f,.18,()=>{const held=f.side==='enemy'?false:!!this._obButtons?.[key];this._obSub(f,key,held);});return true;
+        this._obLater(f,.18,()=>{const held=this._onlineButtons?!!this._onlineButtons[f.side]?.[key]:(f.side==='enemy'?false:!!this._obButtons?.[key]);this._obSub(f,key,held);});return true;
       }
       if(key==='u'&&s.comboReady>0&&s.perfect>0){return this._obCombo(f,false);}
       if(key==='o'&&s.comboReady>0&&s.perfect>0){if(f.chakra<4)return false;return this._obCombo(f,true);}
@@ -74,10 +74,10 @@
       return super._action(f,key);
     }
     _obBasic(f){
-      const s=f.obito,t=this.state[other(f.side)];f.facing=t.x>=f.x?1:-1;f.attackIndex=f._lastBasic<1.1?f.attackIndex%6+1:1;f._lastBasic=0;
+      const s=f.obito,t=this.state[other(f.side)];this._face(f,t);f.attackIndex=f._lastBasic<1.1?f.attackIndex%6+1:1;f._lastBasic=0;
       const n=f.attackIndex,cast=this._obStart(f,`${n}A`,'basic',[0,.3,.34,.57,.48,.38,.65][n],'');cast.awardChakra=false;
       if(n===4||n===6){s.phase=Math.max(s.phase,.2);this._obVisual(f,'portal',f.x,f.y-70,.45,{radius:65});
-        this._obLater(f,.12,()=>{if(Math.abs(t.x-f.x)<330){f.x=clamp(t.x+(n===4?70:-100)*f.facing,110,1170);f.y=t.y;f.facing=t.x>=f.x?1:-1;}else f.x=clamp(f.x+f.facing*120,110,1170);});}
+        this._obLater(f,.12,()=>{if(Math.abs(t.x-f.x)<330){f.x=clamp(t.x+(n===4?70:-100)*f.facing,110,1170);f.y=t.y;this._face(f,t);}else f.x=clamp(f.x+f.facing*120,110,1170);});}
       this._obLater(f,n===4||n===6?.23:.08,()=>this._obHit(f,n===2||n===3?'shuriken':n===5?'woodFist':n===6?'chain':'kick',cast,
         {damage:28+n*3,isBasic:true,lift:n===1||n===2?0:n===3?470:n===6?380:300,knockback:n===6?170:35,width:n===6?330:n===5?280:220,offsetX:n===5?125:80}));
       if(n===3)this._obLater(f,.34,()=>this._obHit(f,'shuriken',cast,{damage:23,isBasic:true,lift:330,width:245}));return true;

@@ -82,6 +82,24 @@
       this.input.y = clamp(number(input.y, 0), -1, 1);
     }
 
+    _direction(f) {
+      return this._onlineInputs?.[f.side] || (f.side === 'player' ? this.input : f.shenju?.aim || f.xiayin?.aim || f.obito?.aim || f.sasukeXiayin?.aim || {x:0,y:0});
+    }
+
+    _face(f, target = this.state[opposite(f.side)]) {
+      const human = f.side === 'player' || !!this._onlineInputs;
+      const x = this._direction(f).x;
+      if (human && Math.abs(x) > .15) f._manualFacing = Math.sign(x);
+      f.facing = human && f._manualFacing ? f._manualFacing : target.x >= f.x ? 1 : -1;
+      return f.facing;
+    }
+
+    _queueBasic(f) {
+      if (f.dead || f.stun > 0 || f.air > 0 || f._airV > 0 || f.knockdown > 0 || f.recovery > 0 || f.captured || f.inKamui || f.sxGrab || f.obRoot || !['skill','ultimate'].includes(f.action) || f.actionTime <= .025) return false;
+      f._basicBuffer = Math.min(5, f.actionTime + .3);
+      return true;
+    }
+
     action(key) {
       key = String(key || '').toLowerCase();
       if (key === ' ' || key === 'spacebar') key = 'space';
@@ -118,7 +136,11 @@
       }
       s.effects = s.effects.filter(e => e.life > 0).slice(-120);
 
-      for (const side of ['player', 'enemy']) this._tickFighter(s[side], dt);
+      for (const side of ['player', 'enemy']) {
+        const f=s[side];
+        if (!f.dead && !f.stun && !f.knockdown && !f.recovery && f.air <= 0 && !f.captured && !f.inKamui && !f.sxGrab && !f.obRoot && Math.abs(this._direction(f).x) > .15) this._face(f);
+        this._tickFighter(f, dt);
+      }
       for (const side of Object.keys(this._switches)) {
         this._switches[side] -= dt;
         if (this._switches[side] <= 0) this._advance(side);
@@ -138,13 +160,20 @@
         }
         for (const side of ['player', 'enemy']) {
           const f = s[side], target = s[opposite(side)];
-          if (!f.stun && !f.knockdown && !f.recovery && f.air <= 0 && f._airV <= 0 && f.action !== 'dash' && f.action !== 'attack' && f.action !== 'skill' && f.action !== 'ultimate') f.facing = target.x >= f.x ? 1 : -1;
+          if (!f.stun && !f.knockdown && !f.recovery && f.air <= 0 && f._airV <= 0 && f.action !== 'dash' && f.action !== 'attack' && f.action !== 'skill' && f.action !== 'ultimate') this._face(f,target);
+          if (f._basicBuffer > 0 && f.actionTime <= .025 && !f.dead && !f.stun && f.air <= 0 && f._airV <= 0 && !f.knockdown && !f.recovery && !f.captured && !f.inKamui && !f.sxGrab && !f.obRoot) { f._basicBuffer=0; this._action(f,'j'); }
         }
       }
       this._tickEntities(dt);
     }
 
     _tickFighter(f, dt) {
+      f._basicBuffer = Math.max(0, (f._basicBuffer || 0) - dt);
+      if (f.stun > 0 || f.air > 0 || f.dead || f.captured || f.inKamui || f.sxGrab || f.obRoot) f._basicBuffer=0;
+      if (f._airHold) {
+        const h=f._airHold,owner=this.state.teams[h.side]?.find(a=>a.uid===h.uid);h.time-=dt;
+        if (h.time<=0 || !owner || owner.dead || owner.stun>0 || owner.air>0 || owner.knockdown>0 || f.protectionLevel==='red' || f.captured || f.inKamui || f.sxGrab) f._airHold=null;
+      }
       for (const key of Object.keys(f.cooldowns)) f.cooldowns[key] = Math.max(0, f.cooldowns[key] - dt);
       f.stun = Math.max(0, f.stun - dt);
       f.invuln = Math.max(0, f.invuln - dt);
@@ -176,8 +205,9 @@
       if (f.air > 0 || f._airV > 0) {
         const maxAir = Math.max(120, f.y - 270);
         const gravity = f.protectionLevel === 'red' ? 2300 : f.protectionLevel === 'yellow' ? 1550 : 1050;
-        f.air = clamp(f.air + f._airV * dt, 0, maxAir);
-        f._airV -= gravity * dt;
+        const holding = f._airHold && f._airV <= 0 && f.air > 0;
+        if (holding) f._airV=0;
+        else { f.air = clamp(f.air + f._airV * dt, 0, maxAir); f._airV -= gravity * dt; }
         if (f.air >= maxAir) f._airV = Math.min(f._airV, 0);
         if (!f.air) {
           f._airV = 0;
@@ -224,6 +254,7 @@
       this._stopDash(f); this._clearArmor(f); this._resetProtection(f);
       f.stun = f.air = f._airV = f._vx = f._vy = f.knockdown = f.recovery = f.actionTime = 0;
       f.action = f.dead ? 'dead' : 'idle'; f.castType = f.castName = '';
+      f._airHold=null; f._basicBuffer=0; f._manualFacing=0;
       f.attackIndex = 0; f._lastBasic = 1; f._basicTimer = 0;
       f.invuln = invuln; f.invulnKind = invulnKind;
     }
@@ -244,7 +275,7 @@
       if (key === 'k') return false;
       if (target.dead) return false;
       if (f.knockdown > 0 || f.recovery > 0 || f.air > 0 || f._airV > 0 || f.stun > 0 || f.actionTime > .025) return false;
-      f.facing = target.x >= f.x ? 1 : -1;
+      this._face(f,target);
       if (key === 'j') return this._basic(f);
       if (key === 'u' || key === 'i') {
         if (f.cooldowns[key] > 0) return false;
@@ -300,6 +331,7 @@
       f.chakra -= 1; f.cooldowns.space = 15; f.stun = 0; f.invuln = SUBSTITUTE_INVULN; f.invulnKind = 'substitute';
       f.knockdown = f.recovery = 0;
       f.action = 'substitute'; f.actionTime = .22; f.air = 0; f._airV = 0; f._vx = f._vy = 0; f._dashTime = 0;
+      f._airHold=null; f._basicBuffer=0;
       this._effect('smoke', f.x, f.y - 45, '#e1e9e9', .6, { radius: 65, text: '替身' });
       const behind = target.x - target.facing * 160;
       f.x = clamp(behind, 110, 1170);
@@ -344,7 +376,7 @@
           break;
         case 'teleport':
           this._effect('smoke', f.x, f.y - 30, color, .4, { radius: 55 });
-          f.x = clamp(target.x - target.facing * 85, 100, 1180); f.y = target.y; f.facing = target.x >= f.x ? 1 : -1;
+          f.x = clamp(target.x - target.facing * 85, 100, 1180); f.y = target.y; this._face(f,target);
           spawn({ kind: 'area', x: target.x, y: target.y, radius: 115, height: 90, delay: .14, lift: 280 });
           break;
         case 'projectile':
@@ -426,7 +458,7 @@
         const owner = s.teams[e.owner].find(f => f.uid === e.ownerUid);
         if (e.delay > 0) { e.delay -= dt; continue; }
         e.life -= dt;
-        if (e.follow && owner && !owner.dead) { e.x = owner.x + owner.facing * (e.offsetX || 0); e.y = owner.y; }
+        if (e.follow && owner && !owner.dead) { e.x = owner.x + owner.facing * (e.offsetX || 0); e.y = owner.y; e.facing=owner.facing; e.visualHeight=owner.sasukeXiayin?.height||owner.shenju?.height||owner.xiayin?.height||owner.obito?.height||0; }
         e.x += e.vx * dt; e.y += e.vy * dt;
         if (e.x < 30 || e.x > W + 80 || e.y < 320 || e.y > 690) e.life = 0;
         const target = s[opposite(e.owner)];
@@ -460,6 +492,7 @@
         && (target.armorKind === 'adamant' || (target.armorKind === 'skill' && e.isBasic === true));
       const launch = Math.max(0, number(e.lift, 0));
       if (!castArmor) {
+        target._basicBuffer=0;
         this._stopDash(target); this._clearArmor(target);
         target._vx = dir * number(e.knockback, 0);
         if (e.pull) { target._vx = (attacker.x - target.x) * 4.5; target._vy = (attacker.y - target.y) * 3; }
@@ -477,6 +510,7 @@
             target.air = 3; target._airV = launch;
           }
           target._launched = true;
+          if (!e.isBasic && !e.isUltimate && target.protectionLevel !== 'red' && attacker.action === 'skill') target._airHold={uid:attacker.uid,side:attacker.side,time:clamp(attacker.actionTime+.28,.22,1.25)};
         }
         target.stun = Math.max(target.stun, clamp(number(e.stun, .3), 0, 1.05));
         target.actionTime = target.stun; target.action = 'hurt';

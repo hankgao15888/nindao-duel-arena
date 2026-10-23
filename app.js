@@ -81,6 +81,7 @@
   $('reselect').onclick=()=>{if(engine&&engine.state.status==='playing')engine.pause(true);clearControls();modal('CHANGE SQUAD','重新选择忍者','本场对战将结束，返回出战阵容。',[['返回选人',showSelection,true],['继续对战',resume,false]]);};
   function showResult(){if(!engine||engine.state.status!=='ended'||won)return;won=true;const s=engine.state;const r=s.result;const winner=typeof r==='string'?r:r?.winner;const victory=winner==='player';modal('DUEL COMPLETE',victory?'决斗胜利':winner==='draw'?'势均力敌':'再接再厉',`<p>${victory?'忍道，由你来证明。':'调整技能距离与替身时机，再战一场。'}</p><p>出战阵容：${team.map(id=>esc(byId(id).name)).join(' · ')}</p>`,[['再次对战',begin,true],['更换阵容',showSelection,false]]);tone(victory?660:180,.5,'triangle',.06);}
   const helpBody=`<div class="help-grid"><div><b>摇杆 / WASD / 方向键</b>移动</div><div><b>J</b>普通攻击，连按衔接</div><div><b>U / I</b>技能一 / 技能二</div><div><b>O</b>奥义，消耗四格奥义点</div><div><b>空格</b>替身，消耗一格奥义点</div><div><b>L</b>秘卷</div><div><b>H</b>通灵</div><div><b>Esc</b>暂停 / 继续</div></div>
+    <p>左右摇杆可调整朝向，松开后保持所选朝向；技能动作期间提前按 J，结束后接普攻。技能命中的短暂浮空便于追击，连击保护和替身继续生效。佐助强化普攻的各段均可用摇杆跨 Y 移动。</p>
     <p>双方每位忍者的生命值为 3000。普攻区分平推和击飞；受击、浮空、倒地及起身期间只能在冷却和奥义点允许时使用替身。</p>
     <p>普通技能施放期间的硬体可抵抗普攻打断。奥义、秘卷与通灵的施放保护可抵抗控制，但仍会受到伤害；替身和起身无敌才会阻止伤害。</p>
     <p>U / I 技能成功命中后，每次施放最多获得一格奥义点；打空、普攻、秘卷、通灵和奥义不额外加点。四格可释放奥义，替身消耗一格。</p>
@@ -259,7 +260,7 @@
     $('skillU').textContent=s.pending?.key==='u'?'J 追剑 / O 架势':'炎剑 · 须佐斩';$('skillI').textContent=s.pending?.key==='i'?'J 雷刺 / O 飞鸟':'雷剑 · 千鸟锐枪';$('skillO').textContent=s.follow==='fireGuard'?'长按 · 劫火':s.follow==='rise'||s.follow==='senbon'?'长按 · 雷麟':'短按格挡 / 长按奥义';
     document.querySelector('[data-action="u"]>span').textContent='炎';document.querySelector('[data-action="i"]>span').textContent='雷';const attack=document.querySelector('[data-action="j"]');attack.querySelector('span').textContent='剑';attack.querySelector('b').textContent=s.enhanced>0?'强化七段普攻':'双剑五段普攻';
     $('shenjuMove').textContent=s.move?.name||'侠隐江湖 · 雷火双剑';
-    $('shenjuHint').textContent=s.follow==='fireGuard'?(s.guardSuccess?'格挡成功 · J 连斩 · 四点 O 劫火':'J 剑气 · 四点长按 O 劫火'):s.follow==='rise'?'J 千鸟千本 · 四点长按 O 雷麟':s.follow==='senbon'?'四点 O 雷麟碎空闪':s.follow==='fireSword'?'天照前再按 J · 瞬身追剑':s.follow==='thunderSword'?'命中后 J 雷影连斩':s.follow==='pulse'?'J 一点强化双剑 · 四点长按 O 踏日裁岳':'U / I 快接 J 或 O · O→J 强化 · 四点长按 O 奥义';
+    $('shenjuHint').textContent=s.follow==='fireGuard'?(s.guardSuccess?'格挡成功 · J 连斩 · 四点 O 劫火':'J 剑气 · 四点长按 O 劫火'):s.follow==='rise'?'J 千鸟千本 · 四点长按 O 雷麟':s.follow==='senbon'?'四点 O 雷麟碎空闪':s.follow==='fireSword'?'天照前再按 J · 瞬身追剑':s.follow==='thunderSword'?'命中后 J 雷影连斩':s.follow==='pulse'?'J 一点强化双剑 · 四点长按 O 踏日裁岳':s.enhanced>0?'强化普攻各段摇杆跨 Y · 四点长按 O 奥义':'U / I 快接 J 或 O · O→J 强化 · 四点长按 O 奥义';
     $('shenjuFollow').style.width=Math.min(100,(s.pending?s.pending.time/.22:s.followTime/1.6)*100)+'%';
     $('wushuangTrack').hidden=s.enhanced<=0;$('wushuangTrack').querySelector('i').style.width=s.enhanced/14*100+'%';$('wushuangTrack').querySelector('b').textContent='双剑强化 '+s.enhanced.toFixed(1)+' 秒';
     document.querySelector('.bottom-hint').textContent='WASD 移动 · U 炎剑 / I 雷剑，快接 J 或 O 派生 · 短按 O 格挡 · 长按 O 奥义';
