@@ -1,0 +1,12 @@
+.is-sasuke-xiayin .main-skills .skill-one{background:radial-gradient(circle at 30% 25%,#efa36f,#78394c 60%,#282237);border-color:#ffc897;order:1}
+.is-sasuke-xiayin .main-skills .ultimate{background:radial-gradient(circle at 35% 25%,#b5a5e3,#594579 60%,#24213b);border-color:#d1bcfa;order:2}
+.is-sasuke-xiayin .main-skills .skill-two{background:radial-gradient(circle at 30% 25%,#a3d4ff,#495e9f 60%,#202b49);border-color:#b6d5ff;order:3}
+.is-sasuke-xiayin .main-skills .attack{order:4;background:radial-gradient(circle at 30% 25%,#bbb6de,#635c89 55%,#2d2b47)}
+.is-sasuke-xiayin .main-skills .ultimate{left:82px;bottom:140px;right:auto;top:auto;width:70px;height:70px}
+.is-sasuke-xiayin .main-skills .skill-two{left:auto;right:45px;top:-6px;bottom:auto;width:78px;height:78px}
+.is-sasuke-xiayin .shenju-panel{border-color:#b5b2ff;background:linear-gradient(90deg,#24233ce8,#252d42ce);width:24%}
+.is-sasuke-xiayin .shenju-follow i{background:linear-gradient(90deg,#ffb669,#b2caff)}
+.sasuke-energy{height:13px;background:#211e35}.sasuke-energy i{background:linear-gradient(90deg,#e9a064,#aba4ef,#a8ddff);box-shadow:0 0 9px #a393ff}.sasuke-energy:after{content:'';position:absolute;top:0;bottom:0;left:50%;width:2px;background:#201e35}.sasuke-energy span{z-index:1;line-height:11px}
+.is-sasuke-enhanced .attack{box-shadow:0 0 22px #c1a5ff99;border-color:#f0d9ff}
+.is-sasuke-xiayin .action-button b{font-size:9px;max-width:95px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:760px){.is-sasuke-xiayin .shenju-panel{width:43%}.sasuke-energy{height:10px}.sasuke-energy span{line-height:8px}.is-sasuke-xiayin .action-button b{font-size:7px}}

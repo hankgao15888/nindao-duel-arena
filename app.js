@@ -34,7 +34,7 @@
     held.clear();pressedKeys.clear();pointerKeys.clear();stick.x=stick.y=0;
     const pointerId=stick.pointerId;stick.pointerId=null;
     if(pointerId!==null&&joystick.hasPointerCapture(pointerId))joystick.releasePointerCapture(pointerId);
-    if(engine){engine.setInput({x:0,y:0});if(engine.setButtonHeld)for(const k of ['j','u','i','q','e'])engine.setButtonHeld(k,false);}
+    if(engine){engine.setInput({x:0,y:0});if(engine.setButtonHeld)for(const k of ['j','u','i','o','q','e'])engine.setButtonHeld(k,false);}
     joystick.querySelector('.stick-center').style.transform='translate(0px,0px)';
   }
   try { const saved=JSON.parse(localStorage.getItem('naruto-duel-team')||'null'); if (Array.isArray(saved)&&saved.length===3&&saved.every(id=>roster.some(n=>n.id===id))&&new Set(saved).size===3) team=saved; viewed=team[0]; } catch {}
@@ -89,6 +89,7 @@
     <p>神驹斑最多六格奥义点，U / I 使用能量条。O 消耗四格进入无双；J 九段连斩，U 蓝色键或 O 消耗剩余点数与能量发动须佐终结。无双期间仅命中回能，斩击时有霸体。练习模式可点“练习补给”体验完整招式。</p>
     <p><b>侠隐江湖专属：</b>U 金钟格挡，可长按；黄条内再次 U 落钟，成功格挡后落钟索敌。U 快接 J 为跳抓，I 快接 J 为乘龙俯冲，也可从技能按钮滑向普攻。4A 后上方向加 J 进入空中连击。钟禁锢敌人时，J 飞踢送钟，I 双龙盘钟，U 钟上感化（技能需冷却就绪）。左下角可选择明神门或树界降临。</p>
     <p><b>忍战带土专属：</b>U 扦插固定，再按 U 爆风乱舞，引燃木刺追加爆炸。I 神威可取消普攻或忍术，并解锁 Q 突进、E 坠落；短按攻击，长按只虚化移动。子技能命中后 J 吸入时空间，再按 J 提前扔出，或用 U 扔出接木遁。神威瞬间闪避攻击会触发紫光，紫光子技能命中后可接 U 空间火遁、O 魔像巨掌。普通 O 为十尾奥义。</p>
+    <p><b>佐助「侠隐江湖」：</b>U 炎剑、I 雷剑消耗一格剑意；自动回能，命中也回能。技能快接 J / O 或触屏滑向对应按钮可派生。U→J 火剑天照前再 J 瞬身追剑；I→J 雷剑命中再 J 雷影连斩；U→O 架势格挡成功后连按 J 四式；I→O 飞鸟上挑后 J 千鸟千本。短按 O 须佐格挡，O→J 消耗一点强化七段普攻。四点时长按 O 踏日裁岳，炎剑架势中长按 O 劫火烙八荒，飞鸟中长按 O／千本后按 O 雷麟碎空闪。强化第五段擒拿成功才可接六、七段。</p>
     <p>三人依次出战，击倒对方全队获胜。每个小回合分出胜负后，双方技能冷却全部归零，下一位忍者登场时再次重置；练习目标击破、恢复时同样生效。生命值和奥义点沿用现有规则。练习模式的对手不主动攻击。当前为原版规则的参考实现，精确帧数和数值仍有简化。</p>`;
   $('help').onclick=()=>{pausedForModal=!!engine&&engine.state.status==='playing';if(pausedForModal)engine.pause(true);clearControls();modal('HOW TO PLAY','操作说明',keyHints(helpBody),[['知道了',()=>{if(pausedForModal)resume();else $('modal').hidden=true;},true]]);};
   $('reference').onclick=()=>{const n=byId(viewed);modal('CHARACTER REFERENCE',n.name,`<div class="reference-notes"><strong>${esc(fullName(n))}</strong><p>技能名称与主要表现参考用户提供的角色攻略。本作使用自行编写的动画与战斗逻辑。</p><p>冷却、伤害、移动距离和浮空数值为本地游戏调校，不能作为原版数据使用。</p>${n.notes?`<p>${esc(n.notes)}</p>`:''}<a href="${esc(n.source)}" target="_blank" rel="noopener">打开该角色的参考文章 ↗</a></div>`,[['返回选人',()=>$('modal').hidden=true,true]]);};
@@ -138,6 +139,7 @@
     if(fighter.inKamui)return '神威空间';
     if(fighter.obRoot)return '扦插固定';
     if(fighter.captured)return '禁锢';
+    if(fighter.sxGrab)return '擒拿';
     if(fighter.knockdown>0)return '倒地';
     if(fighter.recovery>0)return '起身';
     if(fighter.air>0||fighter._airV>0)return '浮空';
@@ -148,7 +150,7 @@
     const player=engine.state.player;if(!player||player.dead)return;
     const locked=controlLabel(player);
     if(locked&&key!=='space'){toast(`${locked}中，仅可使用替身`);return;}
-    if(key==='o'&&player.chakra<4&&!player.shenju?.wushuang){toast('奥义需要四格奥义点');return;}
+    if(key==='o'&&player.chakra<4&&!player.shenju?.wushuang&&!player.sasukeXiayin){toast('奥义需要四格奥义点');return;}
     if(key==='space'&&player.chakra<1){toast('替身需要一格奥义点');return;}
     if(key==='space'&&player.cooldowns.space>0){toast('替身尚未冷却');return;}
     engine.setInput(movementInput());engine.action(key);syncHUD();
@@ -197,16 +199,16 @@
     button.addEventListener('pointerdown',event=>{event.preventDefault();if(!engine||engine.state.status!=='playing'||!$('modal').hidden||!$('keySettings').hidden)return;pointerKeys.set(event.pointerId,button.dataset.action);updateButtonHeld(button.dataset.action);act(button.dataset.action);});
     button.addEventListener('click',event=>{if(event.detail===0)act(button.dataset.action);});
   });
-  for(const key of ['u','i']){const button=document.querySelector(`[data-action="${key}"]`);
-    button.addEventListener('pointerdown',event=>{const p=engine?.state.player;if(p?.xiayin||key==='i'&&p?.shenju)button.setPointerCapture(event.pointerId);});
-    button.addEventListener('pointerup',event=>{const p=engine?.state.player;if(!p?.xiayin&&!(key==='i'&&p?.shenju))return;const r=document.querySelector('[data-action="j"]').getBoundingClientRect();if(event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom)act(p.xiayin?key+'j':'j');});
+  for(const key of ['u','i','o']){const button=document.querySelector(`[data-action="${key}"]`);
+    button.addEventListener('pointerdown',event=>{const p=engine?.state.player;if(p?.sasukeXiayin||p?.xiayin&&key!=='o'||key==='i'&&p?.shenju)button.setPointerCapture(event.pointerId);});
+    button.addEventListener('pointerup',event=>{const p=engine?.state.player;if(p?.sasukeXiayin){for(const next of ['j','o']){if(key===next)continue;const r=document.querySelector(`[data-action="${next}"]`).getBoundingClientRect();if(event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom){act(key+next);return;}}return;}if(key==='o'||!p?.xiayin&&!(key==='i'&&p?.shenju))return;const r=document.querySelector('[data-action="j"]').getBoundingClientRect();if(event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom)act(p.xiayin?key+'j':'j');});
   }
   for(const event of ['pointerup','pointercancel'])window.addEventListener(event,e=>{const key=pointerKeys.get(e.pointerId);pointerKeys.delete(e.pointerId);if(key)updateButtonHeld(key);});
   for(const side of ['p','e']){const bar=document.createElement('div');bar.id=side+'Energy';bar.className='shenju-energy';bar.hidden=true;bar.innerHTML='<i></i><span></span>';$(side+'Chakra').after(bar);}
   const special=document.createElement('div');special.id='shenjuPanel';special.className='shenju-panel';special.hidden=true;
   special.innerHTML='<b id="shenjuMove"></b><div class="shenju-follow"><i id="shenjuFollow"></i></div><span id="shenjuHint"></span><div id="wushuangTrack" class="wushuang-track" hidden><i></i><b></b></div>';$('hud').append(special);
   const supply=document.createElement('button');supply.id='trainingSupply';supply.className='icon-button training-supply';supply.textContent='练习补给';supply.hidden=true;$('hud').append(supply);
-  supply.onclick=()=>{if(!engine||engine.mode!=='training')return;const p=engine.state.player;if(p.dead)return;p.chakra=p.maxChakra||4;if(p.shenju)p.shenju.energy=100;if(p.xiayin)p.xiayin.bellCooldown=0;if(p.obito)p.obito.qUsed=p.obito.eUsed=false;Object.keys(p.cooldowns).forEach(k=>p.cooldowns[k]=0);syncHUD();toast('练习补给：能量、奥义点与冷却已恢复');$('arena').focus();};
+  supply.onclick=()=>{if(!engine||engine.mode!=='training')return;const p=engine.state.player;if(p.dead)return;p.chakra=p.maxChakra||4;if(p.shenju)p.shenju.energy=100;if(p.xiayin)p.xiayin.bellCooldown=0;if(p.obito)p.obito.qUsed=p.obito.eUsed=false;if(p.sasukeXiayin)p.sasukeXiayin.energy=2;Object.keys(p.cooldowns).forEach(k=>p.cooldowns[k]=0);syncHUD();toast('练习补给：能量、奥义点与冷却已恢复');$('arena').focus();};
   const scrollControl=document.createElement('label');scrollControl.className='xiayin-scroll-control';scrollControl.hidden=true;scrollControl.innerHTML='专属秘卷 <select id="xiayinScroll" aria-label="专属秘卷"><option value="gate">明神门</option><option value="forest">树界降临</option></select>';document.querySelector('.arena-actions').append(scrollControl);
   $('xiayinScroll').onchange=()=>{if(engine?.setXiayinScroll)engine.setXiayinScroll($('xiayinScroll').value);$('arena').focus();};
   function syncShenju(p){
@@ -250,6 +252,18 @@
     $('shenjuFollow').style.width=Math.min(100,(combo?s.comboReady/2.6:s.unlock>0?s.unlock/5:s.woodWindow/3.2)*100)+'%';
     if(s.unlock>0){$('pEnergy').hidden=false;$('pEnergy').querySelector('i').style.width=s.unlock/5*100+'%';$('pEnergy').querySelector('span').textContent=`神威子技能 ${s.unlock.toFixed(1)} 秒${s.perfect>0?' · 紫光':''}`;}
   }
+  function syncSasuke(p){
+    const s=p.sasukeXiayin;$('hud').classList.toggle('is-sasuke-xiayin',!!s);$('hud').classList.toggle('is-sasuke-enhanced',!!s?.enhanced);
+    document.querySelector('[data-action="o"]>span').textContent=s?'御':'奥';if(!s)return;
+    special.hidden=!!s.move?.fx?.startsWith('ult');
+    $('skillU').textContent=s.pending?.key==='u'?'J 追剑 / O 架势':'炎剑 · 须佐斩';$('skillI').textContent=s.pending?.key==='i'?'J 雷刺 / O 飞鸟':'雷剑 · 千鸟锐枪';$('skillO').textContent=s.follow==='fireGuard'?'长按 · 劫火':s.follow==='rise'||s.follow==='senbon'?'长按 · 雷麟':'短按格挡 / 长按奥义';
+    document.querySelector('[data-action="u"]>span').textContent='炎';document.querySelector('[data-action="i"]>span').textContent='雷';const attack=document.querySelector('[data-action="j"]');attack.querySelector('span').textContent='剑';attack.querySelector('b').textContent=s.enhanced>0?'强化七段普攻':'双剑五段普攻';
+    $('shenjuMove').textContent=s.move?.name||'侠隐江湖 · 雷火双剑';
+    $('shenjuHint').textContent=s.follow==='fireGuard'?(s.guardSuccess?'格挡成功 · J 连斩 · 四点 O 劫火':'J 剑气 · 四点长按 O 劫火'):s.follow==='rise'?'J 千鸟千本 · 四点长按 O 雷麟':s.follow==='senbon'?'四点 O 雷麟碎空闪':s.follow==='fireSword'?'天照前再按 J · 瞬身追剑':s.follow==='thunderSword'?'命中后 J 雷影连斩':s.follow==='pulse'?'J 一点强化双剑 · 四点长按 O 踏日裁岳':'U / I 快接 J 或 O · O→J 强化 · 四点长按 O 奥义';
+    $('shenjuFollow').style.width=Math.min(100,(s.pending?s.pending.time/.22:s.followTime/1.6)*100)+'%';
+    $('wushuangTrack').hidden=s.enhanced<=0;$('wushuangTrack').querySelector('i').style.width=s.enhanced/14*100+'%';$('wushuangTrack').querySelector('b').textContent='双剑强化 '+s.enhanced.toFixed(1)+' 秒';
+    document.querySelector('.bottom-hint').textContent='WASD 移动 · U 炎剑 / I 雷剑，快接 J 或 O 派生 · 短按 O 格挡 · 长按 O 奥义';
+  }
   function updateStick(e){
     const rect=joystick.getBoundingClientRect(),radius=rect.width*.35;
     if(radius<=0)return;
@@ -270,7 +284,7 @@
     $('pHealth').style.width=Math.max(0,p.hp/p.maxHP*100)+'%';$('eHealth').style.width=Math.max(0,e.hp/e.maxHP*100)+'%';$('pHPValue').textContent=`${Math.ceil(p.hp)} / ${p.maxHP}`;$('eHPValue').textContent=`${Math.ceil(e.hp)} / ${e.maxHP}`;$('timer').textContent=Math.max(0,Math.ceil(s.time));$('round').textContent=mode==='training'?'自由练习':`${s.indices.player+1} / 3  ·  ${s.indices.enemy+1} / 3`;
     [['p',p],['e',e]].forEach(([side,fighter])=>{
       $(side+'Chakra').innerHTML=Array.from({length:fighter.maxChakra||4},(_,index)=>`<i class="${fighter.chakra>=index+1?'full':''}"></i>`).join('');
-      const energy=$(side+'Energy');energy.hidden=!fighter.shenju;if(fighter.shenju){energy.querySelector('i').style.width=fighter.shenju.energy+'%';energy.querySelector('span').textContent=`能量 ${Math.floor(fighter.shenju.energy)} / 100`;}
+      const energy=$(side+'Energy');energy.hidden=!fighter.shenju&&!fighter.sasukeXiayin;energy.classList.toggle('sasuke-energy',!!fighter.sasukeXiayin);if(fighter.sasukeXiayin){energy.querySelector('i').style.width=fighter.sasukeXiayin.energy/2*100+'%';energy.querySelector('span').textContent='剑意 '+fighter.sasukeXiayin.energy.toFixed(1)+' / 2';}if(fighter.shenju){energy.querySelector('i').style.width=fighter.shenju.energy+'%';energy.querySelector('span').textContent=`能量 ${Math.floor(fighter.shenju.energy)} / 100`;}
       const teamSide=side==='p'?'player':'enemy';
       $(side+'Team').innerHTML=s.teams[teamSide].map((member,index)=>`<span class="${member.dead?'dead':index===s.indices[teamSide]?'current':''}">${esc(member.profile.name)}</span>`).join('');
       const notes=[],level=fighter.protectionLevel||'none';
@@ -284,14 +298,14 @@
       if(fighter.obito?.phase>0)notes.push('虚化');
       if(fighter.obito?.perfect>0)notes.push('紫光');
       if(fighter.inKamui)notes.push('神威空间');
-      if(fighter.obRoot)notes.push('扦插');
+      if(fighter.obRoot)notes.push('扦插');if(fighter.sxGrab)notes.push('擒拿');if(fighter.sxBurn)notes.push('灼烧');if(fighter.sasukeXiayin?.enhanced>0)notes.push('双剑强化');if(fighter.sasukeXiayin?.guard>0)notes.push('须佐格挡');
       if(fighter.armorTime>0)notes.push(fighter.armorKind==='adamant'?'金刚体':'硬体');
       if(fighter.invuln>0&&['substitute','getup'].includes(fighter.invulnKind))notes.push(fighter.invulnKind==='substitute'?'替身无敌':'起身无敌');
       $(side+'State').textContent=[side==='p'?'玩家':'电脑',...notes].join(' · ');
       $(side+'Portrait').classList.toggle('protection-yellow',level==='yellow');
       $(side+'Portrait').classList.toggle('protection-red',level==='red');
     });
-    syncShenju(p);syncXiayin(p);syncObito(p);$('shenjuHint').textContent=keyHints($('shenjuHint').textContent);document.querySelector('.bottom-hint').textContent=keyHints(document.querySelector('.bottom-hint').textContent);if(!p.xiayin)document.querySelector('[data-action="l"] b').textContent='秘卷';
+    syncShenju(p);syncXiayin(p);syncObito(p);syncSasuke(p);$('shenjuHint').textContent=keyHints($('shenjuHint').textContent);document.querySelector('.bottom-hint').textContent=keyHints(document.querySelector('.bottom-hint').textContent);if(!p.xiayin)document.querySelector('[data-action="l"] b').textContent='秘卷';
     const locked=controlLabel(p);$('hud').classList.toggle('control-locked',!!locked);$('airborneStatus').hidden=!locked;
     $('airborneStatus').textContent=p.dead?'忍者退场 · 下一位即将登场':`${locked}中 · 仅可使用替身`;
     document.querySelectorAll('[data-action]').forEach(button=>{
@@ -304,7 +318,8 @@
       else if(p.shenju?.wushuang&&key==='i')text='无双';
       else if(p.shenju&&key==='i'&&p.shenju.jumps>=2)text='二段';
       else if(p.shenju&&['u','i'].includes(key)&&!p.shenju.wushuang&&p.shenju.energy<(key==='i'?(p.shenju.jumps?16:18):(p.shenju.followTime>0?15:20)))text='能量';
-      else if(key==='o'&&p.chakra<4&&!p.shenju?.wushuang)text=`${Math.floor(p.chakra)}/4`;
+      else if(p.sasukeXiayin&&['u','i'].includes(key)&&p.sasukeXiayin.energy<1&&!p.sasukeXiayin.pending)text='能量';
+      else if(key==='o'&&p.chakra<4&&!p.shenju?.wushuang&&!p.sasukeXiayin)text=`${Math.floor(p.chakra)}/4`;
       else if(key==='space'&&p.chakra<1)text='1格';
       cover.hidden=!text;cover.textContent=text;button.classList.toggle('not-ready',!!text);
     });
