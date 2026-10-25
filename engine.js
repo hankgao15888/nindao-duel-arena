@@ -204,7 +204,7 @@
         f._dashTime = Math.max(0, f._dashTime - dt);
       }
       // A substitution can occupy the small visible margin behind a wall-bound opponent.
-      f.x = clamp(f.x + f._vx * dt, f._substituteEdge ? 50 : 100, f._substituteEdge ? 1230 : 1180);
+      f.x = clamp(f.x + f._vx * dt, f._substituteEdge ? Math.min(100, f.x) : 100, f._substituteEdge ? Math.max(1180, f.x) : 1180);
       if (f.x >= 100 && f.x <= 1180) f._substituteEdge = false;
       f.y = clamp(f.y + f._vy * dt, 400, 590);
       f._vx *= Math.exp(-9 * dt);
@@ -346,7 +346,9 @@
       f._airHold=null; f._basicBuffer=0; f._substitutionHit=null;
       this._effect('smoke', f.x, f.y - 45, '#e1e9e9', .6, { radius: 65, text: '替身' });
       const behind = target.x - target.facing * 160;
-      f.x = clamp(behind, 50, 1230);
+      // Shorten the offset near an edge, including an opponent in a previous
+      // substitution's margin. A fixed clamp could put both feet at the same X.
+      f.x = clamp(behind, target.x / 2, (W + target.x) / 2);
       f._substituteEdge = f.x < 100 || f.x > 1180;
       f.y = target.y;
       f.facing = target.x >= f.x ? 1 : -1;
