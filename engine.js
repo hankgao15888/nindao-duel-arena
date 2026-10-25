@@ -10,6 +10,11 @@
   // Local reference-mode estimates, not extracted official frame/threshold data.
   const PROTECTION_YELLOW = .20, PROTECTION_RED = .55;
   const KNOCKDOWN_TIME = .38, RECOVERY_TIME = .24, GETUP_INVULN = 1, SUBSTITUTE_INVULN = 2;
+  const damageReaction = f => f.stun > 0 || f.air > 0 || f._airV > 0 || f.knockdown > 0 || !!(f.captured || f.inKamui || f.obRoot || f.sxGrab);
+  // Shared by the local HUD and online snapshots. Control alone is not damage.
+  const canEscape = (f, target) => !!(f && target && !f.dead && !target.dead && f.recovery <= 0
+    && f._substitutionHit?.attackerUid === target.uid && f._substitutionHit.attackerSide === target.side
+    && f.side !== target.side && damageReaction(f));
   let serial = 0;
 
   class ArenaEngine {
@@ -55,7 +60,7 @@
         protectionDamage: 0, protection: 0, protectionLevel: 'none', _launched: false,
         attackIndex: 0, castType: '', castName: '',
         _vx: 0, _vy: 0, _airV: 0, _basicTimer: 0, _lastBasic: 0, _dashTime: 0, _dashVX: 0,
-        _neutralTime: 0, _aiCombo: 0
+        _neutralTime: 0, _aiCombo: 0, _substitutionHit: null, _substituteEdge: false
       };
     }
 
@@ -198,7 +203,9 @@
         f.x += f._dashVX * dashStep;
         f._dashTime = Math.max(0, f._dashTime - dt);
       }
-      f.x = clamp(f.x + f._vx * dt, 100, 1180);
+      // A substitution can occupy the small visible margin behind a wall-bound opponent.
+      f.x = clamp(f.x + f._vx * dt, f._substituteEdge ? 50 : 100, f._substituteEdge ? 1230 : 1180);
+      if (f.x >= 100 && f.x <= 1180) f._substituteEdge = false;
       f.y = clamp(f.y + f._vy * dt, 400, 590);
       f._vx *= Math.exp(-9 * dt);
       f._vy *= Math.exp(-9 * dt);
@@ -224,6 +231,7 @@
       else if (f.recovery > 0) f.action = 'getup';
       else if (f.stun > 0 || f.air > 0 || f._airV > 0) f.action = 'hurt';
       else if (f.actionTime <= 0) { f.action = 'idle'; f.castType = ''; }
+      if (f.recovery > 0 || !damageReaction(f)) f._substitutionHit = null;
     }
 
     _move(f, x, y, dt) {
@@ -233,7 +241,7 @@
       const rawSpeed = number(f.profile.speed, 1);
       const speed = rawSpeed > 10 ? clamp(rawSpeed, 170, 290) : 220 * clamp(rawSpeed, .7, 1.35);
       const scale = length > 1 ? 1 / length : 1;
-      f.x = clamp(f.x + x * scale * speed * dt, 100, 1180);
+      f.x = clamp(f.x + x * scale * speed * dt, f._substituteEdge ? Math.min(100, f.x) : 100, f._substituteEdge ? Math.max(1180, f.x) : 1180);
       f.y = clamp(f.y + y * scale * speed * .57 * dt, 400, 590);
       if (Math.abs(x) > .1) f.facing = x > 0 ? 1 : -1;
       f.walk += dt * 10;
@@ -255,6 +263,7 @@
       f.stun = f.air = f._airV = f._vx = f._vy = f.knockdown = f.recovery = f.actionTime = 0;
       f.action = f.dead ? 'dead' : 'idle'; f.castType = f.castName = '';
       f._airHold=null; f._basicBuffer=0; f._manualFacing=0;
+      f._substitutionHit=null; f._substituteEdge=false;
       f.attackIndex = 0; f._lastBasic = 1; f._basicTimer = 0;
       f.invuln = invuln; f.invulnKind = invulnKind;
     }
@@ -265,7 +274,10 @@
     }
 
     _resetRoundCooldowns() {
-      for (const side of ['player', 'enemy']) this._resetCooldowns(this.state[side]);
+      for (const side of ['player', 'enemy']) {
+        this._resetCooldowns(this.state[side]);
+        this.state[side]._substitutionHit = null;
+      }
     }
 
     _action(f, key) {
@@ -325,17 +337,18 @@
     }
 
     _substitute(f, target) {
-      if (f.cooldowns.space > 0 || f.chakra < 1 || f.dead) return false;
+      if (f.cooldowns.space > 0 || f.chakra < 1 || !canEscape(f, target)) return false;
       this._stopDash(f);
       this._clearArmor(f); this._resetProtection(f); this._clearCombo();
       f.chakra -= 1; f.cooldowns.space = 15; f.stun = 0; f.invuln = SUBSTITUTE_INVULN; f.invulnKind = 'substitute';
       f.knockdown = f.recovery = 0;
       f.action = 'substitute'; f.actionTime = .22; f.air = 0; f._airV = 0; f._vx = f._vy = 0; f._dashTime = 0;
-      f._airHold=null; f._basicBuffer=0;
+      f._airHold=null; f._basicBuffer=0; f._substitutionHit=null;
       this._effect('smoke', f.x, f.y - 45, '#e1e9e9', .6, { radius: 65, text: '替身' });
       const behind = target.x - target.facing * 160;
-      f.x = clamp(behind, 110, 1170);
-      f.y = clamp(target.y + (target.y > 500 ? -65 : 65), 405, 585);
+      f.x = clamp(behind, 50, 1230);
+      f._substituteEdge = f.x < 100 || f.x > 1180;
+      f.y = target.y;
       f.facing = target.x >= f.x ? 1 : -1;
       this._effect('text', f.x, f.y - 100, '#b1f1ff', .8, { text: '替身 · 免伤' });
       if (f.side === 'player') this._queuedAttack = false;
@@ -486,12 +499,14 @@
       const airborne = target.air > 0 || target._airV > 0;
       const reduction = e.isUltimate || !airborne ? 1 : target.protectionLevel === 'red' ? .7 : target.protectionLevel === 'yellow' ? .9 : 1;
       const damage = Math.max(1, Math.round(number(e.damage, 1) * scale * reduction));
+      const healthBefore = target.hp;
       target.hp = Math.max(0, target.hp - damage);
       const dir = target.x >= attacker.x ? 1 : -1;
       const castArmor = target.armorTime > 0 && target.actionTime > 0 && target.stun <= 0 && !airborne
         && (target.armorKind === 'adamant' || (target.armorKind === 'skill' && e.isBasic === true));
       const launch = Math.max(0, number(e.lift, 0));
       if (!castArmor) {
+        if (attacker.side !== target.side && target.hp > 0 && target.hp < healthBefore) target._substitutionHit = { attackerUid: attacker.uid, attackerSide: attacker.side };
         target._basicBuffer=0;
         this._stopDash(target); this._clearArmor(target);
         target._vx = dir * number(e.knockback, 0);
@@ -646,5 +661,6 @@
     _event(type, payload) { try { this.onEvent({ ...payload, type, skillType: payload.type }); } catch (_) { /* A sound/UI callback must not stop combat. */ } }
   }
 
+  global.ArenaSubstitution = { canEscape };
   global.ArenaEngine = ArenaEngine;
 })(typeof window !== 'undefined' ? window : globalThis);

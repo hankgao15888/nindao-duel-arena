@@ -82,7 +82,7 @@
   function showResult(){if(!engine||engine.state.status!=='ended'||won)return;won=true;const s=engine.state;const r=s.result;const winner=typeof r==='string'?r:r?.winner;const victory=winner==='player';modal('DUEL COMPLETE',victory?'决斗胜利':winner==='draw'?'势均力敌':'再接再厉',`<p>${victory?'忍道，由你来证明。':'调整技能距离与替身时机，再战一场。'}</p><p>出战阵容：${team.map(id=>esc(byId(id).name)).join(' · ')}</p>`,[['再次对战',begin,true],['更换阵容',showSelection,false]]);tone(victory?660:180,.5,'triangle',.06);}
   const helpBody=`<div class="help-grid"><div><b>摇杆 / WASD / 方向键</b>移动</div><div><b>J</b>普通攻击，连按衔接</div><div><b>U / I</b>技能一 / 技能二</div><div><b>O</b>奥义，消耗四格奥义点</div><div><b>空格</b>替身，消耗一格奥义点</div><div><b>L</b>秘卷</div><div><b>H</b>通灵</div><div><b>Esc</b>暂停 / 继续</div></div>
     <p>左右摇杆可调整朝向，松开后保持所选朝向；技能动作期间提前按 J，结束后接普攻。技能命中的短暂浮空便于追击，连击保护和替身继续生效。佐助强化普攻的各段均可用摇杆跨 Y 移动。</p>
-    <p>双方每位忍者的生命值为 3000。普攻区分平推和击飞；受击、浮空、倒地及起身期间只能在冷却和奥义点允许时使用替身。</p>
+    <p>双方每位忍者的生命值为 3000。普攻区分平推和击飞；替身仅能在敌方攻击实际扣血后的受击、浮空、倒地或抓取期间使用，起身后失效；消耗一格奥义点，冷却 15 秒。替身会落在敌人背后，与敌人处于同一条横线。</p>
     <p>普通技能施放期间的硬体可抵抗普攻打断。奥义、秘卷与通灵的施放保护可抵抗控制，但仍会受到伤害；替身和起身无敌才会阻止伤害。</p>
     <p>U / I 技能成功命中后，每次施放最多获得一格奥义点；打空、普攻、秘卷、通灵和奥义不额外加点。四格可释放奥义，替身消耗一格。</p>
     <p>浮空受击会累计保护，黄保和红保会加快下落并减少普通伤害；奥义无视该减伤。自然落地后进入倒地、起身和短暂无敌，再恢复交战。</p>
@@ -152,6 +152,7 @@
     const locked=controlLabel(player);
     if(locked&&key!=='space'){toast(`${locked}中，仅可使用替身`);return;}
     if(key==='o'&&player.chakra<4&&!player.shenju?.wushuang&&!player.sasukeXiayin){toast('奥义需要四格奥义点');return;}
+    if(key==='space'&&!window.ArenaSubstitution.canEscape(player,engine.state.enemy)){toast('仅在敌方攻击实际造成伤害后的受击状态可使用替身');return;}
     if(key==='space'&&player.chakra<1){toast('替身需要一格奥义点');return;}
     if(key==='space'&&player.cooldowns.space>0){toast('替身尚未冷却');return;}
     engine.setInput(movementInput());engine.action(key);syncHUD();
@@ -308,7 +309,7 @@
     });
     syncShenju(p);syncXiayin(p);syncObito(p);syncSasuke(p);$('shenjuHint').textContent=keyHints($('shenjuHint').textContent);document.querySelector('.bottom-hint').textContent=keyHints(document.querySelector('.bottom-hint').textContent);if(!p.xiayin)document.querySelector('[data-action="l"] b').textContent='秘卷';
     const locked=controlLabel(p);$('hud').classList.toggle('control-locked',!!locked);$('airborneStatus').hidden=!locked;
-    $('airborneStatus').textContent=p.dead?'忍者退场 · 下一位即将登场':`${locked}中 · 仅可使用替身`;
+    $('airborneStatus').textContent=p.dead?'忍者退场 · 下一位即将登场':`${locked}中 · ${window.ArenaSubstitution.canEscape(p,s.enemy)?'可使用替身':'当前无法替身'}`;
     document.querySelectorAll('[data-action]').forEach(button=>{
       const key=button.dataset.action,cover=button.querySelector('.cd');if(!cover)return;
       const cooldown=p.cooldowns[key]||0;let text='';
@@ -322,6 +323,7 @@
       else if(p.sasukeXiayin&&['u','i'].includes(key)&&p.sasukeXiayin.energy<1&&!p.sasukeXiayin.pending)text='能量';
       else if(key==='o'&&p.chakra<4&&!p.shenju?.wushuang&&!p.sasukeXiayin)text=`${Math.floor(p.chakra)}/4`;
       else if(key==='space'&&p.chakra<1)text='1格';
+      else if(key==='space'&&!window.ArenaSubstitution.canEscape(p,s.enemy))text='受击可用';
       cover.hidden=!text;cover.textContent=text;button.classList.toggle('not-ready',!!text);
     });
     const combo=typeof s.combo==='number'?s.combo:s.combo?.count||0;$('combo').hidden=combo<2;if(combo>=2)$('combo').querySelector('strong').textContent=combo;
