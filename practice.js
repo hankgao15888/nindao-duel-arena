@@ -44,6 +44,21 @@
       if(f.obito)f.obito.qUsed=f.obito.eUsed=false;
       return true;
     }
+    resetPractice(){
+      if(this.mode!=='training')return false;
+      // Keep the selected opponent, including one changed since practice began.
+      this.options.enemy=[this.state.enemy.id];
+      this.releasePractice();for(const key of keys)this.setButtonHeld(key,false);
+      this._reset();
+      this._onlineInputs={player:this.input,enemy:{x:0,y:0}};
+      this._onlineButtons={player:{},enemy:{}};
+      for(const side of ['player','enemy'])for(const f of this.state.teams[side]){
+        f.hp=f.maxHP;f.chakra=f.maxChakra||4;this._resetCooldowns(f);
+        if(f.shenju)f.shenju.energy=100;
+        if(f.sasukeXiayin)f.sasukeXiayin.energy=2;
+      }
+      this.start();return true;
+    }
     _cpu(dt){
       if(this.mode!=='training')return super._cpu(dt);
       const f=this.state.enemy;this._move(f,0,0,dt);
@@ -60,7 +75,7 @@
       this.options=options;this.pointers=new Map();this.held=new Set();this.selected='naruto-kcm';
       try{const id=localStorage.getItem('naruto-practice-opponent');if(options.roster.some(n=>n.id===id))this.selected=id;}catch{}
       this.root=document.createElement('div');this.root.id='practiceControls';this.root.className='practice-controls';this.root.hidden=true;
-      this.root.innerHTML='<div class="practice-heading"><label>对手 <select aria-label="练习对手角色"></select></label><button type="button" class="practice-refill" aria-label="恢复对手生命、奥义点和技能冷却" title="对手补给：恢复生命、奥义点、能量和冷却">↻</button></div><div class="practice-actions" role="group" aria-label="练习对手技能"></div>';
+      this.root.innerHTML='<div class="practice-heading"><label>对手 <select aria-label="练习对手角色"></select></label><button type="button" class="practice-refill" aria-label="恢复对手生命、奥义点和技能冷却" title="对手补给：恢复生命、奥义点、能量和冷却">↻</button><button type="button" class="practice-reset" title="双方全部补给并恢复开局位置">复位</button></div><div class="practice-actions" role="group" aria-label="练习对手技能"></div>';
       document.querySelector('.enemy-hud').append(this.root);this.select=this.root.querySelector('select');this.refreshRoster();
       this.select.onchange=()=>{
         const e=this.options.engine(),id=this.select.value;
@@ -68,6 +83,7 @@
         document.getElementById('arena').focus();
       };
       this.root.querySelector('.practice-refill').onclick=()=>{if(this.allowed()&&this.options.engine().supplyPracticeOpponent()){this.options.changed();this.options.toast('对手补给已恢复');document.getElementById('arena').focus();}};
+      this.root.querySelector('.practice-reset').onclick=()=>{if(this.allowed())this.options.reset();};
       const row=this.root.querySelector('.practice-actions');
       for(const key of keys){
         const b=document.createElement('button');b.type='button';b.className='practice-skill';b.dataset.practice=key;b.innerHTML=`<span aria-hidden="true">${glyphs[key]}</span><kbd></kbd><i hidden></i>`;
@@ -97,6 +113,7 @@
       const e=this.options.engine(),visible=!!(e?.mode==='training'&&!e.isRemote);this.root.hidden=!visible;document.getElementById('hud').classList.toggle('is-practice',visible);if(!visible)return;
       const f=e.state.enemy;this.select.value=f.id;this.select.disabled=e.state.status!=='playing';
       this.root.querySelector('.practice-refill').disabled=!this.allowed()||f.dead;
+      this.root.querySelector('.practice-reset').disabled=!this.allowed();
       for(const b of this.root.querySelectorAll('[data-practice]')){
         const key=b.dataset.practice,label=this.options.key('enemy_'+key);b.hidden=(key==='q'||key==='e')&&!f.obito;b.disabled=!this.allowed()||f.dead;
         const name=key==='u'?f.profile.skills[0]?.name:key==='i'?f.profile.skills[1]?.name:key==='o'?f.profile.ultimate.name:names[key];
