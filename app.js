@@ -13,6 +13,7 @@
   const held = new Set(), pressedKeys = new Map(), pointerKeys = new Map(), byId=id=>roster.find(n=>n.id===id)||roster[0];
   let keyStorage;try{keyStorage=window.localStorage;}catch{}
   const keybindings = new window.ArenaKeybindings(keyStorage);
+  let practice=null;
   let chatPausedEngine=null;
   window.addEventListener('arena-chat-open',()=>{chatPausedEngine=engine?.state.status==='playing'?engine:null;if(chatPausedEngine)engine.pause(true);clearControls();});
   window.addEventListener('arena-chat-close',()=>{clearControls();if(engine===chatPausedEngine&&engine?.state.status==='paused'&&$('modal').hidden&&$('keySettings').hidden)engine.pause(false);chatPausedEngine=null;});
@@ -31,6 +32,7 @@
     return {x:Math.max(-1,Math.min(1,keyboardX+stick.x)),y:Math.max(-1,Math.min(1,keyboardY+stick.y))};
   }
   function clearControls(){
+    practice?.release();
     held.clear();pressedKeys.clear();pointerKeys.clear();stick.x=stick.y=0;
     const pointerId=stick.pointerId;stick.pointerId=null;
     if(pointerId!==null&&joystick.hasPointerCapture(pointerId))joystick.releasePointerCapture(pointerId);
@@ -70,10 +72,10 @@
   function toast(text){$('toast').textContent=text;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,1800);}
   function tone(freq,duration=.06,type='sine',gain=.04){if(!sound)return;try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();audio.resume();const o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.setValueAtTime(freq,audio.currentTime);o.frequency.exponentialRampToValueAtTime(Math.max(40,freq*.45),audio.currentTime+duration);g.gain.setValueAtTime(gain,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+duration);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+duration);}catch{}}
   function onEvent(e){if(e.type==='hit')tone(130,.065,'triangle',.055);if(e.type==='cast')tone(500,.14,'sawtooth',.025);if(e.type==='ko')tone(90,.4,'triangle',.08);if(e.type==='end')setTimeout(showResult,400);}
-  function begin(){if(team.some(id=>locked(id))){sanitizeTeam();drawRoster();drawSquad();drawDetail();window.ArenaAuth?.open('此阵容含有需要登录的忍者，请先登录。');return;}clearControls();won=false;const enemies=playable().sort(()=>Math.random()-.5).slice(0,3).map(n=>n.id);engine=new window.ArenaEngine({roster,team:[...team],enemy:enemies,difficulty:$('difficulty').value,mode,onEvent});engine.start();portraitIds='';$('selection').hidden=true;$('modal').hidden=true;$('hud').hidden=false;$('trainingTip').hidden=mode!=='training';$('arena').focus();syncHUD();tone(700,.22);}
+  function begin(){if(team.some(id=>locked(id))){sanitizeTeam();drawRoster();drawSquad();drawDetail();window.ArenaAuth?.open('此阵容含有需要登录的忍者，请先登录。');return;}clearControls();won=false;const enemies=mode==='training'?[practice.opponentId()]:playable().sort(()=>Math.random()-.5).slice(0,3).map(n=>n.id);engine=new window.ArenaEngine({roster,team:[...team],enemy:enemies,difficulty:$('difficulty').value,mode,onEvent,canPracticeOpponent:id=>!locked(id)});engine.start();portraitIds='';$('selection').hidden=true;$('modal').hidden=true;$('hud').hidden=false;$('trainingTip').hidden=mode!=='training';$('arena').focus();syncHUD();tone(700,.22);}
   $('start').addEventListener('click',begin);
-  function showSelection(){clearControls();engine=null;$('hud').hidden=true;$('modal').hidden=true;$('selection').hidden=false;drawRoster();drawSquad();drawDetail();}
-  window.addEventListener('arena-auth-change',()=>{const restricted=team.some(id=>locked(id));if(restricted){sanitizeTeam();save();if(engine)showSelection();}if(window.ArenaAuth?.user&&pendingPick){const requested=pendingPick;pendingPick=null;slot=requested.slot;pick(requested.id);}drawRoster();drawSquad();drawDetail();});
+  function showSelection(){clearControls();engine=null;practice?.sync();$('hud').hidden=true;$('modal').hidden=true;$('selection').hidden=false;drawRoster();drawSquad();drawDetail();}
+  window.addEventListener('arena-auth-change',()=>{const restricted=team.some(id=>locked(id));if(restricted){sanitizeTeam();save();if(engine)showSelection();}if(window.ArenaAuth?.user&&pendingPick){const requested=pendingPick;pendingPick=null;slot=requested.slot;pick(requested.id);}practice?.refreshRoster();drawRoster();drawSquad();drawDetail();});
   function modal(label,title,body,buttons){$('modalLabel').textContent=label;$('modalTitle').textContent=title;$('modalBody').innerHTML=body;$('modalActions').innerHTML='';buttons.forEach(([text,fn,primary])=>{const b=document.createElement('button');b.className=primary?'gold-button':'icon-button';b.textContent=text;b.onclick=fn;$('modalActions').append(b);});$('modal').hidden=false;}
   function resume(){if(engine&&engine.state.status==='paused')engine.pause(false);clearControls();$('modal').hidden=true;$('arena').focus();}
   function pauseGame(){if(!engine||engine.state.status==='ended')return;if(engine.state.status==='paused'){resume();return;}engine.pause(true);clearControls();modal('MATCH PAUSED','对战暂停','喘口气，下一次出手更加从容。',[['继续对战',resume,true],['重新选人',showSelection,false]]);}
@@ -91,7 +93,7 @@
     <p><b>侠隐江湖专属：</b>U 金钟格挡，可长按；黄条内再次 U 落钟，成功格挡后落钟索敌。U 快接 J 为跳抓，I 快接 J 为乘龙俯冲，也可从技能按钮滑向普攻。4A 后上方向加 J 进入空中连击。钟禁锢敌人时，J 飞踢送钟，I 双龙盘钟，U 钟上感化（技能需冷却就绪）。左下角可选择明神门或树界降临。</p>
     <p><b>忍战带土专属：</b>U 扦插固定，再按 U 爆风乱舞，引燃木刺追加爆炸。I 神威可取消普攻或忍术，并解锁 Q 突进、E 坠落；短按攻击，长按只虚化移动。子技能命中后 J 吸入时空间，再按 J 提前扔出，或用 U 扔出接木遁。神威瞬间闪避攻击会触发紫光，紫光子技能命中后可接 U 空间火遁、O 魔像巨掌。普通 O 为十尾奥义。</p>
     <p><b>佐助「侠隐江湖」：</b>U 炎剑、I 雷剑消耗一格剑意；自动回能，命中也回能。技能快接 J / O 或触屏滑向对应按钮可派生。U→J 火剑天照前再 J 瞬身追剑；I→J 雷剑命中再 J 雷影连斩；U→O 架势格挡成功后连按 J 四式；I→O 飞鸟上挑后 J 千鸟千本。短按 O 须佐格挡，O→J 消耗一点强化七段普攻。四点时长按 O 踏日裁岳，炎剑架势中长按 O 劫火烙八荒，飞鸟中长按 O／千本后按 O 雷麟碎空闪。强化第五段擒拿成功才可接六、七段。</p>
-    <p>三人依次出战，击倒对方全队获胜。每个小回合分出胜负后，双方技能冷却全部归零，下一位忍者登场时再次重置；练习目标击破、恢复时同样生效。生命值和奥义点沿用现有规则。练习模式的对手不主动攻击。当前为原版规则的参考实现，精确帧数和数值仍有简化。</p>`;
+    <p>三人依次出战，击倒对方全队获胜。每个小回合分出胜负后，双方技能冷却全部归零，下一位忍者登场时再次重置；练习目标击破、恢复时同样生效。生命值和奥义点沿用现有规则。练习模式的对手不主动攻击。可在对手血条下选择角色、点击小技能按钮，或用数字键 1—7 施放对手普攻、两种忍术、奥义、替身、秘卷和通灵，8 / 9 为带土子技能；长按也支持，对手补给 ↻ 恢复生命、能量和冷却。对手快捷键可在按键设置中修改。当前为原版规则的参考实现，精确帧数和数值仍有简化。</p>`;
   $('help').onclick=()=>{pausedForModal=!!engine&&engine.state.status==='playing';if(pausedForModal)engine.pause(true);clearControls();modal('HOW TO PLAY','操作说明',keyHints(helpBody),[['知道了',()=>{if(pausedForModal)resume();else $('modal').hidden=true;},true]]);};
   $('reference').onclick=()=>{const n=byId(viewed);modal('CHARACTER REFERENCE',n.name,`<div class="reference-notes"><strong>${esc(fullName(n))}</strong><p>技能名称与主要表现参考用户提供的角色攻略。本作使用自行编写的动画与战斗逻辑。</p><p>冷却、伤害、移动距离和浮空数值为本地游戏调校，不能作为原版数据使用。</p>${n.notes?`<p>${esc(n.notes)}</p>`:''}<a href="${esc(n.source)}" target="_blank" rel="noopener">打开该角色的参考文章 ↗</a></div>`,[['返回选人',()=>$('modal').hidden=true,true]]);};
   $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'音效：开':'音效：关';if(sound)tone(660,.12);};
@@ -187,13 +189,16 @@
       if(!$('modal').hidden){if(engine&&engine.state.status==='paused')resume();else $('modal').hidden=true;}else pauseGame();return;
     }
     if(!engine||engine.state.status!=='playing'||!$('modal').hidden)return;
-    const k=keybindings.resolve(e.code);if(!k)return;
-    e.preventDefault();pressedKeys.set(e.code,k);held.add(k);updateButtonHeld(k);
+    const k=keybindings.resolve(e.code);if(!k||k.startsWith('enemy_')&&engine.mode!=='training')return;
+    e.preventDefault();pressedKeys.set(e.code,k);held.add(k);
+    if(k.startsWith('enemy_')){practice.setHeld(k.slice(6),true);if(!e.repeat||k==='enemy_j')practice.act(k.slice(6));return;}
+    updateButtonHeld(k);
     if(['j','u','i','o','space','l','h','q','e'].includes(k)&&(!e.repeat||k==='j'))act(k);
   });
   window.addEventListener('keyup',e=>{
     const k=pressedKeys.get(e.code);pressedKeys.delete(e.code);if(!k)return;
-    if(![...pressedKeys.values()].includes(k))held.delete(k);updateButtonHeld(k);
+    if(![...pressedKeys.values()].includes(k))held.delete(k);
+    if(k.startsWith('enemy_')){practice.setHeld(k.slice(6),held.has(k));return;}updateButtonHeld(k);
   });
   window.addEventListener('blur',()=>{clearControls();if(engine&&engine.state.status==='playing')pauseGame();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden){clearControls();if(engine&&engine.state.status==='playing')pauseGame();}});
@@ -209,7 +214,7 @@
   for(const side of ['p','e']){const bar=document.createElement('div');bar.id=side+'Energy';bar.className='shenju-energy';bar.hidden=true;bar.innerHTML='<i></i><span></span>';$(side+'Chakra').after(bar);}
   const special=document.createElement('div');special.id='shenjuPanel';special.className='shenju-panel';special.hidden=true;
   special.innerHTML='<b id="shenjuMove"></b><div class="shenju-follow"><i id="shenjuFollow"></i></div><span id="shenjuHint"></span><div id="wushuangTrack" class="wushuang-track" hidden><i></i><b></b></div>';$('hud').append(special);
-  const supply=document.createElement('button');supply.id='trainingSupply';supply.className='icon-button training-supply';supply.textContent='练习补给';supply.hidden=true;$('hud').append(supply);
+  const supply=document.createElement('button');supply.id='trainingSupply';supply.className='icon-button training-supply';supply.textContent='练习补给';supply.hidden=true;document.querySelector('.arena-actions').append(supply);
   supply.onclick=()=>{if(!engine||engine.mode!=='training')return;const p=engine.state.player;if(p.dead)return;p.chakra=p.maxChakra||4;if(p.shenju)p.shenju.energy=100;if(p.xiayin)p.xiayin.bellCooldown=0;if(p.obito)p.obito.qUsed=p.obito.eUsed=false;if(p.sasukeXiayin)p.sasukeXiayin.energy=2;Object.keys(p.cooldowns).forEach(k=>p.cooldowns[k]=0);syncHUD();toast('练习补给：能量、奥义点与冷却已恢复');$('arena').focus();};
   const scrollControl=document.createElement('label');scrollControl.className='xiayin-scroll-control';scrollControl.hidden=true;scrollControl.innerHTML='专属秘卷 <select id="xiayinScroll" aria-label="专属秘卷"><option value="gate">明神门</option><option value="forest">树界降临</option></select>';document.querySelector('.arena-actions').append(scrollControl);
   $('xiayinScroll').onchange=()=>{if(engine?.setXiayinScroll)engine.setXiayinScroll($('xiayinScroll').value);$('arena').focus();};
@@ -326,9 +331,11 @@
       else if(key==='space'&&!window.ArenaSubstitution.canEscape(p,s.enemy))text='受击可用';
       cover.hidden=!text;cover.textContent=text;button.classList.toggle('not-ready',!!text);
     });
+    practice?.sync();
     const combo=typeof s.combo==='number'?s.combo:s.combo?.count||0;$('combo').hidden=combo<2;if(combo>=2)$('combo').querySelector('strong').textContent=combo;
     if(s.status==='ended')showResult();
   }
   function tick(now){const dt=Math.min(.033,(now-last)/1000);last=now;drawTime+=dt;if(engine){const input=movementInput();engine.setInput(input);engine.update(dt);renderer.render(engine.state,dt);const center=joystick.querySelector('.stick-center');center.style.transform=`translate(${input.x*24}px,${input.y*24}px)`;if(now-lastHUD>70){syncHUD();lastHUD=now;}}else renderer.render({elapsed:drawTime,status:'idle',entities:[],effects:[],player:null,enemy:null},dt);requestAnimationFrame(tick);}
+  practice=new window.ArenaPracticeControls({engine:()=>engine,roster,locked:id=>locked(id),key:keyLabel,blocked:()=>!$('modal').hidden||!$('keySettings').hidden,changed:()=>{portraitIds='';clearControls();syncHUD();},toast});
   drawRoster();drawSquad();refreshKeyLabels();requestAnimationFrame(tick);
 })();

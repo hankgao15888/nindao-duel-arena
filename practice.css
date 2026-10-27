@@ -1,0 +1,17 @@
+.practice-controls{position:absolute;top:calc(100% + 6px);right:0;width:min(100%,350px);padding:5px 6px;background:#112222e8;border:1px solid #bc98684d;border-radius:5px;pointer-events:auto;text-align:left;box-shadow:0 3px 12px #0003}
+.practice-controls[hidden],.practice-skill[hidden]{display:none!important}
+.practice-heading{display:flex;gap:5px;align-items:center;margin-bottom:5px}
+.practice-heading label{display:flex;align-items:center;gap:6px;min-width:0;flex:1;font-size:10px;color:#dac9a3;white-space:nowrap}
+.practice-heading select{min-width:0;flex:1;width:100%;height:23px;background:#0c1919;border:1px solid #9d8c5c66;color:#efe4c7;border-radius:3px;font:10px "Microsoft YaHei",sans-serif;padding:0 3px}
+.practice-refill{width:24px;height:23px;border:1px solid #a4905d66;background:#d5b96e17;color:#eac982;border-radius:3px;font-size:17px;line-height:1;flex-shrink:0}
+.practice-actions{display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;scrollbar-width:thin;padding-bottom:1px}
+.practice-skill{position:relative;flex:1 0 27px;min-width:27px;max-width:39px;height:37px;padding:2px 1px;border:1px solid #c8a86e66;border-radius:4px;color:#f3d69d;background:radial-gradient(ellipse at 50% 10%,#89704c55,#1a2b29);touch-action:none;user-select:none}
+.practice-skill>span{display:block;font:700 15px "Microsoft YaHei",sans-serif;line-height:19px}
+.practice-skill kbd{display:block;font:9px "Segoe UI",sans-serif;line-height:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c3ccbe}
+.practice-skill>i{position:absolute;inset:0;display:grid;place-items:center;background:#0c1516b3;border-radius:3px;font:700 10px "Microsoft YaHei",sans-serif;color:#e8d2a4;pointer-events:none}
+.practice-skill>i[hidden]{display:none}.practice-skill:hover,.practice-skill:focus-visible{outline:1px solid #f1ce85;background-color:#77603c}.practice-skill:active{transform:translateY(1px)}
+.practice-controls button:disabled{cursor:default;opacity:.5}.hud.is-practice .training-tip{display:none}
+.hud.is-practice .shenju-panel{left:3%;top:100px;bottom:auto;width:min(36%,260px)}
+.hud.is-practice .training-supply{position:static}
+@media(max-width:1100px){.practice-controls{width:100%;padding:4px}.practice-skill{height:33px;min-width:25px;flex-basis:25px}.practice-skill>span{font-size:13px;line-height:16px}.practice-actions{gap:3px}}
+@media(max-width:760px){.practice-controls{width:clamp(190px,40vw,270px);max-width:calc(100vw - 20px);top:calc(100% + 5px)}.practice-heading{margin-bottom:3px}.practice-heading select{font-size:9px;height:21px}.practice-heading label{font-size:9px}.practice-skill{height:29px;min-width:22px;flex-basis:22px}.practice-skill>span{font-size:12px;line-height:14px}.practice-skill kbd{font-size:8px;line-height:9px}.practice-skill>i{font-size:9px}.practice-refill{height:21px;width:22px}.practice-actions{gap:2px}}

@@ -6,7 +6,11 @@
     ['s','向下移动','KeyS'], ['d','向右移动','KeyD'],
     ['j','普通攻击','KeyJ'], ['u','技能一','KeyU'], ['i','技能二','KeyI'],
     ['o','奥义','KeyO'], ['space','替身','Space'], ['l','秘卷','KeyL'],
-    ['h','通灵','KeyH'], ['q','带土子技能一','KeyQ'], ['e','带土子技能二','KeyE']
+    ['h','通灵','KeyH'], ['q','带土子技能一','KeyQ'], ['e','带土子技能二','KeyE'],
+    ['enemy_j','练习对手 · 普攻','Digit1'], ['enemy_u','练习对手 · 一技能','Digit2'],
+    ['enemy_i','练习对手 · 二技能','Digit3'], ['enemy_o','练习对手 · 奥义','Digit4'],
+    ['enemy_space','练习对手 · 替身','Digit5'], ['enemy_l','练习对手 · 秘卷','Digit6'],
+    ['enemy_h','练习对手 · 通灵','Digit7'], ['enemy_q','练习对手 · 神威突进','Digit8'], ['enemy_e','练习对手 · 神威坠落','Digit9']
   ].map(([id,name,code]) => Object.freeze({id,name,code}));
   const defaults = Object.freeze(Object.fromEntries(actions.map(a => [a.id,a.code])));
   const arrows = {ArrowUp:'w',ArrowLeft:'a',ArrowDown:'s',ArrowRight:'d'};
@@ -27,9 +31,15 @@
       this.bindings = {...defaults};
       try {
         const saved = JSON.parse(storage.getItem('naruto-duel-keybindings') || 'null');
-        if (saved && actions.every(a => allowed(saved[a.id])) &&
-            new Set(actions.map(a => saved[a.id])).size === actions.length)
-          this.bindings = Object.fromEntries(actions.map(a => [a.id,saved[a.id]]));
+        const core=actions.filter(a=>!a.id.startsWith('enemy_'));
+        if (saved && core.every(a => allowed(saved[a.id])) && new Set(core.map(a => saved[a.id])).size === core.length) {
+          const used=new Set(core.map(a=>saved[a.id]));
+          this.bindings=Object.fromEntries(core.map(a=>[a.id,saved[a.id]]));
+          for(const a of actions.filter(a=>a.id.startsWith('enemy_'))){
+            const code=[saved[a.id],a.code,...Array.from({length:10},(_,i)=>'Numpad'+i),...actions.map(a=>a.code)].find(code=>allowed(code)&&!used.has(code));
+            this.bindings[a.id]=code;used.add(code);
+          }
+        }
       } catch {} // Private browsing or malformed data keeps the original controls usable.
     }
     label(action) { return label(this.bindings[action]); }
